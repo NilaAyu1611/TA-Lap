@@ -56,6 +56,7 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
 import lapanganRoutes from "./routes/lapanganRoutes.js";
 import pesananRoutes from "./routes/pesananRoutes.js";
+import pembayaranRoutes from "./routes/pembayaranRoutes.js";
 
 dotenv.config();
 
@@ -63,7 +64,7 @@ const app = express();
 app.use(express.json());
 app.use("/lapangan", lapanganRoutes);
 app.use("/pesanan", pesananRoutes);
-
+app.use("/pembayaran", pembayaranRoutes);
 // pakai route
 app.use("/auth", authRoutes);
 
