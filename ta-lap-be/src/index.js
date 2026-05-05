@@ -55,12 +55,14 @@ import express from "express";
 import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
 import lapanganRoutes from "./routes/lapanganRoutes.js";
+import pesananRoutes from "./routes/pesananRoutes.js";
 
 dotenv.config();
 
 const app = express();
 app.use(express.json());
 app.use("/lapangan", lapanganRoutes);
+app.use("/pesanan", pesananRoutes);
 
 // pakai route
 app.use("/auth", authRoutes);
