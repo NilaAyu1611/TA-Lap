@@ -1,7 +1,9 @@
 import prisma from "../config/prisma.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { serializeBigInt } from "../utils/serialize.js";
 
+// REGISTER
 export const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
@@ -17,12 +19,17 @@ export const register = async (req, res) => {
       }
     });
 
-    res.json(user);
+    res.status(201).json({
+      message: "Register berhasil",
+      data: serializeBigInt(user)
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
+// LOGIN
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -47,19 +54,25 @@ export const login = async (req, res) => {
 
     const token = jwt.sign(
       {
-        id: user.id,
+        id: user.id.toString(), // 🔥 penting (hindari BigInt di token)
         role: user.role
       },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    res.json({ token, user });
+    res.json({
+      message: "Login berhasil",
+      token,
+      user: serializeBigInt(user)
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
+// LOGOUT
 export const logout = async (req, res) => {
   res.json({ message: "Logout berhasil" });
 };
