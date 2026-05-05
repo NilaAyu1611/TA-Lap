@@ -32,20 +32,39 @@
 //   console.log("Server jalan di http://localhost:3002");
 // });
 
-import express from "express";
-import cors from "cors";
+// import express from "express";
+// import cors from "cors";
 
+// import authRoutes from "./routes/authRoutes.js";
+// import lapanganRoutes from "./routes/lapanganRoutes.js";
+
+// const app = express();
+
+// app.use(cors());
+// app.use(express.json());
+
+// app.use("/auth", authRoutes);
+// app.use("/lapangan", lapanganRoutes);
+
+// app.listen(3002, () => {
+//   console.log("Server jalan di port 3002");
+// });
+
+
+import express from "express";
+import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes.js";
 import lapanganRoutes from "./routes/lapanganRoutes.js";
 
+dotenv.config();
+
 const app = express();
-
-app.use(cors());
 app.use(express.json());
-
-app.use("/auth", authRoutes);
 app.use("/lapangan", lapanganRoutes);
 
-app.listen(3002, () => {
-  console.log("Server jalan di port 3002");
+// pakai route
+app.use("/auth", authRoutes);
+
+app.listen(process.env.PORT, () => {
+  console.log(`Server jalan di port ${process.env.PORT}`);
 });
