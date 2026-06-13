@@ -1,73 +1,40 @@
-// import dotenv from "dotenv";
-// dotenv.config();
-
-// import { PrismaClient } from "@prisma/client";
-
-// const prisma = new PrismaClient();
-
-// async function test() {
-//   try {
-//     const users = await prisma.user.findMany();
-//     console.log(users);
-//   } catch (err) {
-//     console.error(err);
-//   }
-// }
-
-// test();
-
-
-// import express from "express";
-// import { PrismaClient } from "@prisma/client";
-
-// const app = express();
-// const prisma = new PrismaClient();
-
-// app.get("/", async (req, res) => {
-//   const users = await prisma.user.findMany();
-//   res.json(users);
-// });
-
-// app.listen(3002, () => {
-//   console.log("Server jalan di http://localhost:3002");
-// });
-
-// import express from "express";
-// import cors from "cors";
-
-// import authRoutes from "./routes/authRoutes.js";
-// import lapanganRoutes from "./routes/lapanganRoutes.js";
-
-// const app = express();
-
-// app.use(cors());
-// app.use(express.json());
-
-// app.use("/auth", authRoutes);
-// app.use("/lapangan", lapanganRoutes);
-
-// app.listen(3002, () => {
-//   console.log("Server jalan di port 3002");
-// });
-
-
 import express from "express";
+import cors from "cors";
 import dotenv from "dotenv";
+
 import authRoutes from "./routes/authRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import ownerRoutes from "./routes/ownerRoutes.js";
 import lapanganRoutes from "./routes/lapanganRoutes.js";
 import pesananRoutes from "./routes/pesananRoutes.js";
 import pembayaranRoutes from "./routes/pembayaranRoutes.js";
+import settingsRoutes from "./routes/settingsRoutes.js";
+import laporanRoutes from "./routes/laporanRoutes.js";
 
 dotenv.config();
 
 const app = express();
-app.use(express.json());
-app.use("/lapangan", lapanganRoutes);
-app.use("/pesanan", pesananRoutes);
-app.use("/pembayaran", pembayaranRoutes);
-// pakai route
-app.use("/auth", authRoutes);
 
-app.listen(process.env.PORT, () => {
-  console.log(`Server jalan di port ${process.env.PORT}`);
+app.use(cors());
+app.use(express.json());
+
+app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/owners", ownerRoutes);
+app.use("/api/lapangan", lapanganRoutes);
+app.use("/api/pesanan", pesananRoutes);
+app.use("/api/pembayaran", pembayaranRoutes);
+app.use("/api/settings", settingsRoutes);
+app.use("/api/laporan", laporanRoutes);
+
+app.get("/", (req, res) => {
+  res.send("API berjalan...");
+});
+
+const PORT = process.env.PORT || 3002;
+
+app.listen(PORT, () => {
+  console.log(`Server jalan di port ${PORT}`);
 });
