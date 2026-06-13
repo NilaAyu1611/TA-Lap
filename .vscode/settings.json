@@ -1,0 +1,10 @@
+{
+  "git.enabled": true,
+  "git.path": "C:\\Program Files\\Git\\cmd\\git.exe",
+  "git.autoRepositoryDetection": true,
+  "git.openRepositoryInParentFolders": "always",
+  "git.detectSubmodules": false,
+  "git.scanRepositories": [
+    "C:\\Users\\acer\\TA-Lap"
+  ]
+}
