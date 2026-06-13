@@ -1,48 +1,58 @@
 import prisma from "../config/prisma.js";
 
-const convertBigInt = (data) => {
-  return JSON.parse(
+const convertBigInt = (data) =>
+  JSON.parse(
     JSON.stringify(data, (key, value) =>
       typeof value === "bigint" ? value.toString() : value
     )
   );
+
+const generateKodeBooking = () => {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const rand = Math.floor(Math.random() * 900 + 100);
+  return `BK-${date}-${rand}`;
 };
 
-// GET pesanan milik user login
+const calcTotalHarga = (hargaPerJam, jamMulai, jamSelesai) => {
+  const hours = (jamSelesai - jamMulai) / (1000 * 60 * 60);
+  return Number(hargaPerJam) * Math.max(hours, 1);
+};
+
 export const getMyPesanan = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = BigInt(req.user.id);
 
     const pesanans = await prisma.pesanan.findMany({
-      where: {
-        user_id: userId
-      },
+      where: { user_id: userId },
       include: {
-        lapangan: true
+        lapangan: {
+          include: {
+            jenis: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
+        pembayaran: true,
       },
-      orderBy: {
-        tanggal_booking: "desc"
-      }
+      orderBy: { tanggal_booking: "desc" },
     });
 
     res.json({
       message: "Pesanan berhasil diambil",
-      data: pesanans
+      data: convertBigInt(pesanans),
     });
   } catch (error) {
     res.status(500).json({
       message: "Error ambil pesanan",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-// CREATE pesanan (booking)
 export const createPesanan = async (req, res) => {
   try {
     const userId = BigInt(req.user.id);
-
-    const { lapangan_id, tanggal_booking, jam_mulai, jam_selesai } = req.body;
+    const { lapangan_id, tanggal_booking, jam_mulai, jam_selesai, catatan } = req.body;
 
     const jamMulai = new Date(jam_mulai);
     const jamSelesai = new Date(jam_selesai);
@@ -50,150 +60,115 @@ export const createPesanan = async (req, res) => {
 
     if (jamMulai >= jamSelesai) {
       return res.status(400).json({
-        message: "Jam selesai harus lebih besar dari jam mulai"
+        message: "Jam selesai harus lebih besar dari jam mulai",
       });
+    }
+
+    const lapangan = await prisma.lapangan.findUnique({
+      where: { id: BigInt(lapangan_id) },
+    });
+
+    if (!lapangan) {
+      return res.status(404).json({ message: "Lapangan tidak ditemukan" });
     }
 
     const conflict = await prisma.pesanan.findFirst({
       where: {
-        lapangan_id: Number(lapangan_id),
+        lapangan_id: BigInt(lapangan_id),
         tanggal_booking: tanggal,
+        status: { not: "dibatalkan" },
         OR: [
-          {
-            jam_mulai: { gte: jamMulai, lt: jamSelesai }
-          },
-          {
-            jam_selesai: { gt: jamMulai, lte: jamSelesai }
-          },
+          { jam_mulai: { gte: jamMulai, lt: jamSelesai } },
+          { jam_selesai: { gt: jamMulai, lte: jamSelesai } },
           {
             AND: [
               { jam_mulai: { lte: jamMulai } },
-              { jam_selesai: { gte: jamSelesai } }
-            ]
-          }
-        ]
-      }
+              { jam_selesai: { gte: jamSelesai } },
+            ],
+          },
+        ],
+      },
     });
 
     if (conflict) {
       return res.status(400).json({
-        message: "Waktu booking bentrok dengan pesanan lain"
+        message: "Waktu booking bentrok dengan pesanan lain",
       });
     }
 
+    const totalHarga = calcTotalHarga(lapangan.harga, jamMulai, jamSelesai);
+
     const pesanan = await prisma.pesanan.create({
       data: {
+        kode_booking: generateKodeBooking(),
         user_id: userId,
-        lapangan_id: Number(lapangan_id),
+        lapangan_id: BigInt(lapangan_id),
         tanggal_booking: tanggal,
         jam_mulai: jamMulai,
         jam_selesai: jamSelesai,
-        status: "pending"
-      }
+        catatan: catatan || null,
+        total_harga: totalHarga,
+        status: "pending",
+      },
+      include: {
+        lapangan: {
+          include: {
+            jenis: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
+      },
     });
 
     res.status(201).json({
       message: "Pesanan berhasil dibuat",
-      data: convertBigInt(pesanan)
+      data: convertBigInt(pesanan),
     });
   } catch (error) {
     res.status(500).json({
       message: "Gagal membuat pesanan",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-// export const createPesanan = async (req, res) => {
-//   try {
-//     const userId = req.user.id;
-
-//     const {
-//       lapangan_id,
-//       tanggal_booking,
-//       jam_mulai,
-//       jam_selesai
-//     } = req.body;
-
-//     
-//     const conflict = await prisma.pesanan.findFirst({
-//       where: {
-//         lapangan_id: Number(lapangan_id),
-//         tanggal_booking: new Date(tanggal_booking),
-//         OR: [
-//           {
-//             jam_mulai: {
-//               gte: jam_mulai,
-//               lte: jam_selesai
-//             }
-//           },
-//           {
-//             jam_selesai: {
-//               gte: jam_mulai,
-//               lte: jam_selesai
-//             }
-//           },
-//           {
-//             AND: [
-//               { jam_mulai: { lte: jam_mulai } },
-//               { jam_selesai: { gte: jam_selesai } }
-//             ]
-//           }
-//         ]
-//       }
-//     });
-
-//     if (conflict) {
-//       return res.status(400).json({
-//         message: "Waktu booking bentrok dengan pesanan lain"
-//       });
-//     }
-
-//     const pesanan = await prisma.pesanan.create({
-//       data: {
-//         user_id: userId,
-//         lapangan_id: Number(lapangan_id),
-//         tanggal_booking: new Date(tanggal_booking),
-//         jam_mulai,
-//         jam_selesai,
-//         status: "pending"
-//       }
-//     });
-
-//     // res.status(201).json({
-//     //   message: "Pesanan berhasil dibuat",
-//     //   data: pesanan
-//     // });
-//   } catch (error) {
-//     res.status(500).json({
-//       message: "Gagal membuat pesanan",
-//       error: error.message
-//     });
-//   }
-// };
-
-// ADMIN / OWNER lihat semua pesanan
 export const getAllPesanan = async (req, res) => {
   try {
+    const user = req.user;
+    let whereClause = {};
+
+    if (user.role === "owner") {
+      whereClause = {
+        lapangan: { owner_id: BigInt(user.id) },
+      };
+    }
+
     const data = await prisma.pesanan.findMany({
+      where: whereClause,
       include: {
-        user: true,
-        lapangan: true
-      }
+        user: {
+          select: { id: true, name: true, email: true, phone: true },
+        },
+        lapangan: {
+          include: {
+            jenis: true,
+            owner: { select: { id: true, name: true, email: true } },
+          },
+        },
+        pembayaran: true,
+      },
+      orderBy: { created_at: "desc" },
     });
 
     res.json({
       message: "Semua pesanan",
-      data
+      data: convertBigInt(data),
     });
   } catch (error) {
-    res.status(500).json({
-      error: error.message
-    });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// UPDATE status (admin/owner)
 export const updateStatusPesanan = async (req, res) => {
   try {
     const { id } = req.params;
@@ -201,16 +176,18 @@ export const updateStatusPesanan = async (req, res) => {
 
     const updated = await prisma.pesanan.update({
       where: { id: BigInt(id) },
-      data: { status }
+      data: { status },
+      include: {
+        lapangan: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
     });
 
     res.json({
       message: "Status berhasil diupdate",
-      data: updated
+      data: convertBigInt(updated),
     });
   } catch (error) {
-    res.status(500).json({
-      error: error.message
-    });
+    res.status(500).json({ error: error.message });
   }
 };

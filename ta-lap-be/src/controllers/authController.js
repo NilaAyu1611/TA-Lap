@@ -6,7 +6,16 @@ import { serializeBigInt } from "../utils/serialize.js";
 // REGISTER
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Nama, email, dan password wajib diisi" });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(400).json({ message: "Email sudah terdaftar" });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -15,15 +24,16 @@ export const register = async (req, res) => {
         name,
         email,
         password: hashedPassword,
-        role: role || "user"
-      }
+        role: "user",
+      },
     });
+
+    const { password: _, ...safeUser } = serializeBigInt(user);
 
     res.status(201).json({
       message: "Register berhasil",
-      data: serializeBigInt(user)
+      data: safeUser,
     });
-
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -61,10 +71,12 @@ export const login = async (req, res) => {
       { expiresIn: "1d" }
     );
 
+    const { password: _, ...safeUser } = serializeBigInt(user);
+
     res.json({
       message: "Login berhasil",
       token,
-      user: serializeBigInt(user)
+      user: safeUser,
     });
 
   } catch (error) {
