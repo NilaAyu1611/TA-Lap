@@ -17,6 +17,19 @@ enum Role {
   user
 }
 
+enum StatusUser {
+  active
+  pending
+  blocked
+  suspended
+}
+
+enum StatusOwner {
+  pending
+  approved
+  rejected
+}
+
 enum JenisLapangan {
   badminton
   futsal
@@ -26,12 +39,27 @@ enum StatusPesanan {
   pending
   dibayar
   selesai
+  dibatalkan
+  expired
 }
 
 enum StatusPembayaran {
   menunggu
   sukses
   gagal
+  refund
+}
+
+enum MetodePembayaran {
+  transfer
+  qris
+  cash
+  ewallet
+}
+
+enum BackupStatus {
+  success
+  failed
 }
 
 //////////////////////
@@ -39,58 +67,164 @@ enum StatusPembayaran {
 //////////////////////
 
 model User {
-  id        BigInt   @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(user)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id             BigInt             @id @default(autoincrement())
+  name           String
+  email          String             @unique
+  password       String
+  phone          String?
+  city           String?
+  avatar         String?
+  verification   OwnerVerification?
+  email_verified Boolean            @default(false)
+  role           Role               @default(user)
+  status         StatusUser         @default(active)
+  created_at     DateTime           @default(now())
+  updated_at     DateTime           @updatedAt
 
-  lapangans Lapangan[] @relation("OwnerLapangan")
-  pesanans  Pesanan[]
+  lapangans     Lapangan[]    @relation("OwnerLapangan")
+  pesanans      Pesanan[]
+  logs          ActivityLog[]
+  notifications Notifikasi[]
+}
+
+model JenisOlahraga {
+  id         Int        @id @default(autoincrement())
+  nama       String     @unique
+  icon       String?
+  created_at DateTime   @default(now())
+  lapangans  Lapangan[]
 }
 
 model Lapangan {
-  id        BigInt   @id @default(autoincrement())
-  owner_id  BigInt?
-  nama      String
-  jenis     JenisLapangan
-  harga     Decimal   @default(0)
-  gambar    String?
-  status    Boolean   @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id              BigInt   @id @default(autoincrement())
+  owner_id        BigInt?
+  nama            String
+  jenis_id        Int
+  kapasitas       Int?
+  indoor          Boolean  @default(false)
+  jumlah_court    Int?     @default(1)
+  jam_buka        String?
+  jam_tutup       String?
+  harga           Decimal  @db.Decimal(12, 2)
+  gambar          String?
+  deskripsi       String?
+  status          Boolean  @default(true)
+  alamat          String?
+  kota            String?
+  google_maps_url String?
+  latitude        Decimal? @db.Decimal(10, 8)
+  longitude       Decimal? @db.Decimal(11, 8)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
-  owner     User?      @relation("OwnerLapangan", fields: [owner_id], references: [id])
-  pesanans  Pesanan[]
+  owner    User?           @relation("OwnerLapangan", fields: [owner_id], references: [id])
+  pesanans Pesanan[]
+  images   LapanganImage[]
+  jenis    JenisOlahraga   @relation(fields: [jenis_id], references: [id])
+}
+
+model LapanganImage {
+  id          BigInt   @id @default(autoincrement())
+  lapangan_id BigInt
+  image_url   String
+  lapangan    Lapangan @relation(fields: [lapangan_id], references: [id])
 }
 
 model Pesanan {
-  id              BigInt         @id @default(autoincrement())
+  id              BigInt        @id @default(autoincrement())
+  kode_booking    String        @unique
   user_id         BigInt
   lapangan_id     BigInt
   tanggal_booking DateTime
   jam_mulai       DateTime
   jam_selesai     DateTime
-  status          StatusPesanan  @default(pending)
-  created_at      DateTime       @default(now())
-  updated_at      DateTime       @updatedAt
+  catatan         String?
+  total_harga     Decimal       @db.Decimal(12, 2)
+  status          StatusPesanan @default(pending)
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
 
-  user      User     @relation(fields: [user_id], references: [id])
-  lapangan  Lapangan @relation(fields: [lapangan_id], references: [id])
+  user       User        @relation(fields: [user_id], references: [id])
+  lapangan   Lapangan    @relation(fields: [lapangan_id], references: [id])
   pembayaran Pembayaran?
 }
 
 model Pembayaran {
-  id            BigInt           @id @default(autoincrement())
-  pesanan_id    BigInt           @unique
-  metode        String
-  total_bayar   Int
-  status        StatusPembayaran @default(menunggu)
-  tanggal_bayar DateTime?
-  created_at    DateTime         @default(now())
-  updated_at    DateTime         @updatedAt
+  id               BigInt           @id @default(autoincrement())
+  pesanan_id       BigInt           @unique
+  metode           MetodePembayaran
+  total_bayar      Int
+  bukti_pembayaran Decimal          @db.Decimal(12, 2)
+  refund_reason    String?
+  status           StatusPembayaran @default(menunggu)
+  tanggal_bayar    DateTime?
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
 
-  pesanan   Pesanan @relation(fields: [pesanan_id], references: [id])
+  pesanan Pesanan @relation(fields: [pesanan_id], references: [id])
+}
+
+model OwnerVerification {
+  id         BigInt      @id @default(autoincrement())
+  owner_id   BigInt      @unique
+  ktp        String?
+  foto_usaha String?
+  status     StatusOwner @default(pending)
+  notes      String?
+  created_at DateTime    @default(now())
+
+  owner User @relation(fields: [owner_id], references: [id])
+}
+
+model ActivityLog {
+  id            BigInt   @id @default(autoincrement())
+  user_id       BigInt
+  activity_type String?
+  ip_address    String?
+  device        String?
+  created_at    DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+}
+
+model Setting {
+  id                   Int     @id @default(1)
+  app_name             String
+  app_email            String?
+  app_phone            String?
+  logo                 String?
+  favicon              String?
+  maintenance_mode     Boolean @default(false)
+  booking_notification Boolean @default(true)
+  owner_notification   Boolean @default(true)
+  payment_notification Boolean @default(true)
+  backup_notification  Boolean @default(true)
+}
+
+model BackupLog {
+  id         BigInt        @id @default(autoincrement())
+  file_name  String
+  size       String?
+  status     BackupStatus?
+  created_at DateTime      @default(now())
+}
+
+model Notifikasi {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  title      String
+  message    String
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id])
+}
+
+model MonthlyStatistic {
+  id            BigInt   @id @default(autoincrement())
+  month         Int
+  year          Int
+  total_booking Int
+  total_income  Decimal  @db.Decimal(12, 2)
+  created_at    DateTime @default(now())
 }
