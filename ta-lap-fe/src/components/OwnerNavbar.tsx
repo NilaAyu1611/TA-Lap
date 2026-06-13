@@ -12,6 +12,7 @@ import {
 import { useState } from "react";
 
 import ThemeToggle from "@/components/ThemeToggle";
+import { handleLogout } from "@/lib/auth";
 
 type OwnerNavbarProps = {
   active?: string;
@@ -186,6 +187,7 @@ export default function OwnerNavbar({
 
           {/* LOGOUT */}
           <button
+            onClick={handleLogout}
             className="
               hidden
               md:flex

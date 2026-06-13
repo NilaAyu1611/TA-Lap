@@ -1,16 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-
-import ThemeToggle from "@/components/ThemeToggle";
+import { useEffect, useState } from "react";
 
 import {
-  LayoutDashboard,
-  MapPinned,
   CalendarDays,
-  Receipt,
-  LogOut,
   CreditCard,
   Wallet,
   QrCode,
@@ -20,31 +13,66 @@ import {
   CheckCircle2,
   Clock3,
 } from "lucide-react";
+import UserNavbar from "@/components/UserNavbar";
+import { getMyPesanan } from "@/services/pesanan.service";
+import { createPembayaran } from "@/services/pembayaran.service";
+import { formatDate, formatRupiah, formatTime } from "@/lib/auth";
+
+type PendingPesanan = {
+  id: string;
+  total_harga: number | string;
+  tanggal_booking: string;
+  jam_mulai: string;
+  jam_selesai: string;
+  lapangan?: { nama: string; jenis?: { nama: string } };
+};
 
 export default function PembayaranPage() {
-  const [selectedMethod, setSelectedMethod] =
-    useState("qris");
+  const [selectedMethod, setSelectedMethod] = useState("qris");
+  const [pembayaran, setPembayaran] = useState<PendingPesanan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [payingId, setPayingId] = useState<string | null>(null);
 
-  const pembayaran = [
-    {
-      id: 1,
-      lapangan: "Futsal Arena Elite",
-      jenis: "Futsal",
-      tanggal: "12 Mei 2026",
-      jam: "19:00 - 21:00",
-      total: "Rp240.000",
-      status: "Belum Dibayar",
-    },
-    {
-      id: 2,
-      lapangan: "Badminton Pro Court",
-      jenis: "Badminton",
-      tanggal: "15 Mei 2026",
-      jam: "15:00 - 17:00",
-      total: "Rp160.000",
-      status: "Belum Dibayar",
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const result = await getMyPesanan();
+        const pending = (result.data || []).filter(
+          (p: PendingPesanan & { status: string }) => p.status === "pending"
+        );
+        setPembayaran(pending);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handlePay = async (pesananId: string, total: number | string) => {
+    const metodeMap: Record<string, string> = {
+      qris: "qris",
+      transfer: "transfer",
+      tunai: "cash",
+    };
+
+    try {
+      setPayingId(pesananId);
+      await createPembayaran({
+        pesanan_id: pesananId,
+        metode: metodeMap[selectedMethod] || "qris",
+        total_bayar: Number(total),
+      });
+      setPembayaran((prev) => prev.filter((p) => p.id !== pesananId));
+      alert("Pembayaran berhasil dikirim!");
+    } catch (error) {
+      console.error(error);
+      alert("Gagal melakukan pembayaran.");
+    } finally {
+      setPayingId(null);
+    }
+  };
 
   return (
     <main
@@ -104,204 +132,7 @@ export default function PembayaranPage() {
       </div>
 
       {/* NAVBAR */}
-      <header
-        className="
-          sticky
-          top-0
-          z-50
-
-          border-b
-
-          border-gray-200
-          dark:border-white/10
-
-          bg-white/80
-          dark:bg-[#0b1120]/70
-
-          backdrop-blur-xl
-        "
-      >
-        <div
-          className="
-            mx-auto
-            flex
-            max-w-7xl
-            items-center
-            justify-between
-
-            px-6
-            py-4
-          "
-        >
-          {/* LEFT */}
-          <div className="flex items-center gap-10">
-            <Link
-              href="/user/dashboard"
-              className="
-                text-2xl
-                font-bold
-                tracking-tight
-
-                text-cyan-600
-                dark:text-cyan-400
-              "
-            >
-              TA-LAP
-            </Link>
-
-            <nav className="hidden items-center gap-3 md:flex">
-              <Link
-                href="/user/dashboard"
-                className="
-                  flex
-                  items-center
-                  gap-2
-
-                  rounded-xl
-                  px-4
-                  py-2
-
-                  text-sm
-                  font-medium
-
-                  text-gray-600
-                  dark:text-gray-300
-
-                  transition-all
-                  duration-300
-
-                  hover:bg-cyan-500/10
-                  hover:text-cyan-600
-                "
-              >
-                <LayoutDashboard size={18} />
-                Dashboard
-              </Link>
-
-              <Link
-                href="/user/lapangan"
-                className="
-                  flex
-                  items-center
-                  gap-2
-
-                  rounded-xl
-                  px-4
-                  py-2
-
-                  text-sm
-                  font-medium
-
-                  text-gray-600
-                  dark:text-gray-300
-
-                  transition-all
-                  duration-300
-
-                  hover:bg-cyan-500/10
-                  hover:text-cyan-600
-                "
-              >
-                <MapPinned size={18} />
-                Lapangan
-              </Link>
-
-              <Link
-                href="/user/pesanan"
-                className="
-                  flex
-                  items-center
-                  gap-2
-
-                  rounded-xl
-                  px-4
-                  py-2
-
-                  text-sm
-                  font-medium
-
-                  text-gray-600
-                  dark:text-gray-300
-
-                  transition-all
-                  duration-300
-
-                  hover:bg-cyan-500/10
-                  hover:text-cyan-600
-                "
-              >
-                <CalendarDays size={18} />
-                Pesanan
-              </Link>
-
-              <Link
-                href="/user/pembayaran"
-                className="
-                  flex
-                  items-center
-                  gap-2
-
-                  rounded-xl
-
-                  bg-cyan-500
-                  px-4
-                  py-2
-
-                  text-sm
-                  font-medium
-                  text-white
-
-                  shadow-lg
-                  shadow-cyan-500/20
-                "
-              >
-                <Receipt size={18} />
-                Pembayaran
-              </Link>
-            </nav>
-          </div>
-
-          {/* RIGHT */}
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-
-            <button
-              className="
-                flex
-                items-center
-                gap-2
-
-                rounded-xl
-                border
-
-                border-gray-300
-                dark:border-white/10
-
-                bg-white
-                dark:bg-white/5
-
-                px-4
-                py-2
-
-                text-sm
-                font-medium
-
-                text-gray-700
-                dark:text-gray-200
-
-                transition-all
-                duration-300
-
-                hover:border-red-400
-                hover:text-red-500
-              "
-            >
-              <LogOut size={18} />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <UserNavbar active="pembayaran" />
 
       {/* CONTENT */}
       <section className="relative z-10 mx-auto max-w-7xl px-6 py-10">
@@ -336,6 +167,9 @@ export default function PembayaranPage() {
 
         {/* CARD */}
         <div className="mt-10 space-y-7">
+          {loading && (
+            <p className="text-center text-gray-500">Memuat data pembayaran...</p>
+          )}
           {pembayaran.map((item) => (
             <div
               key={item.id}
@@ -389,7 +223,7 @@ export default function PembayaranPage() {
                         tracking-tight
                       "
                     >
-                      {item.lapangan}
+                      {item.lapangan?.nama || "Lapangan"}
                     </h2>
 
                     <span
@@ -409,7 +243,7 @@ export default function PembayaranPage() {
                         dark:text-cyan-400
                       "
                     >
-                      {item.jenis}
+                      {item.lapangan?.jenis?.nama || "-"}
                     </span>
                   </div>
 
@@ -455,7 +289,7 @@ export default function PembayaranPage() {
                       </div>
 
                       <h4 className="mt-3 font-medium">
-                        {item.tanggal}
+                        {formatDate(item.tanggal_booking)}
                       </h4>
                     </div>
 
@@ -490,7 +324,7 @@ export default function PembayaranPage() {
                       </div>
 
                       <h4 className="mt-3 font-medium">
-                        {item.jam}
+                        {formatTime(item.jam_mulai)} - {formatTime(item.jam_selesai)}
                       </h4>
                     </div>
 
@@ -533,7 +367,7 @@ export default function PembayaranPage() {
                           dark:text-green-400
                         "
                       >
-                        {item.total}
+                        {formatRupiah(item.total_harga)}
                       </h4>
                     </div>
 
@@ -581,7 +415,7 @@ export default function PembayaranPage() {
                         "
                       >
                         <CheckCircle2 size={18} />
-                        {item.status}
+                        Belum Dibayar
                       </div>
                     </div>
                   </div>
@@ -911,6 +745,8 @@ export default function PembayaranPage() {
                 {/* ACTION */}
                 <div className="xl:w-[220px]">
                   <button
+                    onClick={() => handlePay(item.id, item.total_harga)}
+                    disabled={payingId === item.id}
                     className="
                       flex
                       w-full
@@ -940,7 +776,7 @@ export default function PembayaranPage() {
                     "
                   >
                     <CreditCard size={20} />
-                    Bayar Sekarang
+                    {payingId === item.id ? "Memproses..." : "Bayar Sekarang"}
                   </button>
                 </div>
               </div>
@@ -949,7 +785,7 @@ export default function PembayaranPage() {
         </div>
 
         {/* EMPTY */}
-        {pembayaran.length === 0 && (
+        {!loading && pembayaran.length === 0 && (
           <div
             className="
               mt-10

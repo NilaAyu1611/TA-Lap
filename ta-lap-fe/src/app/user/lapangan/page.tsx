@@ -1,53 +1,71 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-import ThemeToggle from "@/components/ThemeToggle";
+import { Search, Filter, Star } from "lucide-react";
+import UserNavbar from "@/components/UserNavbar";
+import { getLapangan } from "@/services/lapangan.service";
+import { createPesanan } from "@/services/pesanan.service";
+import { formatRupiah } from "@/lib/auth";
 
-import {
-  LayoutDashboard,
-  CalendarDays,
-  Receipt,
-  LogOut,
-  MapPinned,
-  Search,
-  Filter,
-  Star,
-} from "lucide-react";
+type LapanganItem = {
+  id: string;
+  nama: string;
+  harga: number | string;
+  status: boolean;
+  gambar?: string;
+  jenis?: { nama: string };
+};
 
 export default function LapanganPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
+  const [lapangans, setLapangans] = useState<LapanganItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [bookingId, setBookingId] = useState<string | null>(null);
 
-  const lapangans = [
-    {
-      id: 1,
-      nama: "Futsal Arena Elite",
-      jenis: "Futsal",
-      harga: "Rp120.000 / jam",
-      status: "Tersedia",
-      image:
-        "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1200&auto=format&fit=crop",
-    },
-    {
-      id: 2,
-      nama: "Badminton Pro Court",
-      jenis: "Badminton",
-      harga: "Rp80.000 / jam",
-      status: "Tersedia",
-      image:
-        "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?q=80&w=1200&auto=format&fit=crop",
-    },
-    {
-      id: 3,
-      nama: "Cyber Sport Center",
-      jenis: "Futsal",
-      harga: "Rp150.000 / jam",
-      status: "Tidak Tersedia",
-      image:
-        "https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1200&auto=format&fit=crop",
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const result = await getLapangan();
+        setLapangans(result.data || []);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleBooking = async (lapanganId: string) => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tanggal = tomorrow.toISOString().split("T")[0];
+    const jamMulai = new Date(`${tanggal}T16:00:00`);
+    const jamSelesai = new Date(`${tanggal}T18:00:00`);
+
+    try {
+      setBookingId(lapanganId);
+      await createPesanan({
+        lapangan_id: lapanganId,
+        tanggal_booking: tanggal,
+        jam_mulai: jamMulai.toISOString(),
+        jam_selesai: jamSelesai.toISOString(),
+      });
+      router.push("/user/pesanan");
+    } catch (error) {
+      console.error(error);
+      alert("Gagal membuat pesanan. Pastikan sudah login.");
+    } finally {
+      setBookingId(null);
+    }
+  };
+
+  const filtered = lapangans.filter((item) =>
+    item.nama.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <main
@@ -107,214 +125,7 @@ export default function LapanganPage() {
       </div>
 
       {/* NAVBAR */}
-      <header
-        className="
-          sticky
-          top-0
-          z-50
-
-          border-b
-
-          border-gray-200
-          dark:border-white/10
-
-          bg-white/80
-          dark:bg-[#0b1120]/70
-
-          backdrop-blur-xl
-        "
-      >
-        <div
-          className="
-            mx-auto
-            flex
-            max-w-7xl
-            items-center
-            justify-between
-
-            px-6
-            py-4
-          "
-        >
-          {/* LEFT */}
-          <div className="flex items-center gap-10">
-            <Link
-              href="/dashboard"
-              className="
-                text-2xl
-                font-bold
-                tracking-tight
-
-                text-cyan-600
-                dark:text-cyan-400
-              "
-            >
-              TA-LAP
-            </Link>
-
-            {/* MENU */}
-            <nav className="hidden items-center gap-3 md:flex">
-              <Link
-                href="/user/dashboard"
-                className="
-                  flex
-                  items-center
-                  gap-2
-
-                  rounded-xl
-
-                  px-4
-                  py-2
-
-                  text-sm
-                  font-medium
-
-                  text-gray-600
-                  dark:text-gray-300
-
-                  transition-all
-                  duration-300
-
-                  hover:bg-cyan-500/10
-                  hover:text-cyan-600
-
-                  dark:hover:text-cyan-400
-                "
-              >
-                <LayoutDashboard size={18} />
-                Dashboard
-              </Link>
-
-              <Link
-                href="/user/lapangan"
-                className="
-                  flex
-                  items-center
-                  gap-2
-
-                  rounded-xl
-
-                  bg-cyan-500
-                  px-4
-                  py-2
-
-                  text-sm
-                  font-medium
-                  text-white
-
-                  shadow-lg
-                  shadow-cyan-500/20
-                "
-              >
-                <MapPinned size={18} />
-                Lapangan
-              </Link>
-
-              <Link
-                href="/user/pesanan"
-                className="
-                  flex
-                  items-center
-                  gap-2
-
-                  rounded-xl
-
-                  px-4
-                  py-2
-
-                  text-sm
-                  font-medium
-
-                  text-gray-600
-                  dark:text-gray-300
-
-                  transition-all
-                  duration-300
-
-                  hover:bg-cyan-500/10
-                  hover:text-cyan-600
-
-                  dark:hover:text-cyan-400
-                "
-              >
-                <CalendarDays size={18} />
-                Pesanan
-              </Link>
-
-              <Link
-                href="/user/pembayaran"
-                className="
-                  flex
-                  items-center
-                  gap-2
-
-                  rounded-xl
-
-                  px-4
-                  py-2
-
-                  text-sm
-                  font-medium
-
-                  text-gray-600
-                  dark:text-gray-300
-
-                  transition-all
-                  duration-300
-
-                  hover:bg-cyan-500/10
-                  hover:text-cyan-600
-
-                  dark:hover:text-cyan-400
-                "
-              >
-                <Receipt size={18} />
-                Pembayaran
-              </Link>
-            </nav>
-          </div>
-
-          {/* RIGHT */}
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-
-            <button
-              className="
-                flex
-                items-center
-                gap-2
-
-                rounded-xl
-                border
-
-                border-gray-300
-                dark:border-white/10
-
-                bg-white
-                dark:bg-white/5
-
-                px-4
-                py-2
-
-                text-sm
-                font-medium
-
-                text-gray-700
-                dark:text-gray-200
-
-                transition-all
-                duration-300
-
-                hover:border-red-400
-                hover:text-red-500
-              "
-            >
-              <LogOut size={18} />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <UserNavbar active="lapangan" />
 
       {/* CONTENT */}
       <section className="relative z-10 mx-auto max-w-7xl px-6 py-10">
@@ -465,7 +276,13 @@ export default function LapanganPage() {
             xl:grid-cols-3
           "
         >
-          {lapangans.map((item) => (
+          {loading && (
+            <p className="col-span-full text-center text-gray-500">Memuat lapangan...</p>
+          )}
+          {!loading && filtered.length === 0 && (
+            <p className="col-span-full text-center text-gray-500">Belum ada lapangan tersedia.</p>
+          )}
+          {filtered.map((item) => (
             <div
               key={item.id}
               className="
@@ -493,7 +310,7 @@ export default function LapanganPage() {
               {/* IMAGE */}
               <div className="relative h-64 overflow-hidden">
                 <img
-                  src={item.image}
+                  src={item.gambar || "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1200&auto=format&fit=crop"}
                   alt={item.nama}
                   className="
                     h-full
@@ -567,7 +384,7 @@ export default function LapanganPage() {
                         dark:text-gray-400
                       "
                     >
-                      {item.jenis}
+                      {item.jenis?.nama || "Olahraga"}
                     </p>
                   </div>
 
@@ -580,13 +397,13 @@ export default function LapanganPage() {
                       font-semibold
 
                       ${
-                        item.status === "Tersedia"
+                        item.status
                           ? "bg-green-100 text-green-600 dark:bg-green-500/10 dark:text-green-400"
                           : "bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400"
                       }
                     `}
                   >
-                    {item.status}
+                    {item.status ? "Tersedia" : "Tidak Tersedia"}
                   </span>
                 </div>
 
@@ -621,14 +438,13 @@ export default function LapanganPage() {
                         dark:text-cyan-400
                       "
                     >
-                      {item.harga}
+                      {formatRupiah(item.harga)} / jam
                     </h4>
                   </div>
 
                   <button
-                    disabled={
-                      item.status !== "Tersedia"
-                    }
+                    onClick={() => handleBooking(item.id)}
+                    disabled={!item.status || bookingId === item.id}
                     className={`
                       rounded-2xl
                       px-5
@@ -641,7 +457,7 @@ export default function LapanganPage() {
                       duration-300
 
                       ${
-                        item.status === "Tersedia"
+                        item.status
                           ? `
                             bg-cyan-500
                             text-white
@@ -661,7 +477,7 @@ export default function LapanganPage() {
                       }
                     `}
                   >
-                    Booking
+                    {bookingId === item.id ? "Memproses..." : "Booking"}
                   </button>
                 </div>
               </div>

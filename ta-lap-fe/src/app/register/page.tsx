@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { register } from "@/services/auth.service";
 
 import {
   Eye,
@@ -16,9 +18,45 @@ import {
 } from "lucide-react";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (password !== confirmPassword) {
+      setError("Konfirmasi password tidak cocok");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password minimal 6 karakter");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await register(name, email, password);
+      router.push("/login");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string; error?: string } } };
+      setError(
+        axiosErr.response?.data?.message ||
+          axiosErr.response?.data?.error ||
+          "Gagal mendaftar"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <main
@@ -363,8 +401,14 @@ export default function RegisterPage() {
             </p>
           </div>
 
+          {error && (
+            <div className="mb-6 rounded-2xl bg-red-500/10 p-4 text-sm text-red-500">
+              {error}
+            </div>
+          )}
+
           {/* FORM */}
-          <form className="space-y-6">
+          <form onSubmit={handleRegister} className="space-y-6">
             {/* NAME */}
             {/* NAME */}
             <div>
@@ -401,7 +445,10 @@ export default function RegisterPage() {
 
                 <input
                   type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Masukkan nama lengkap"
+                  required
                   className="
                     w-full
                     rounded-2xl
@@ -473,7 +520,10 @@ export default function RegisterPage() {
 
                 <input
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="Masukkan email"
+                  required
                   className="
                     w-full
                     rounded-2xl
@@ -544,7 +594,10 @@ export default function RegisterPage() {
 
                 <input
                   type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Masukkan password"
+                  required
                   className="
                     w-full
                     rounded-2xl
@@ -634,7 +687,10 @@ export default function RegisterPage() {
 
                 <input
                   type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Konfirmasi password"
+                  required
                   className="
                     w-full
                     rounded-2xl
@@ -696,6 +752,7 @@ export default function RegisterPage() {
             {/* BUTTON */}
             <button
               type="submit"
+              disabled={loading}
               className="
                 w-full
                 rounded-2xl
@@ -714,7 +771,7 @@ export default function RegisterPage() {
                 hover:bg-cyan-400
               "
             >
-              Daftar Sekarang
+              {loading ? "Memproses..." : "Daftar Sekarang"}
             </button>
           </form>
 
