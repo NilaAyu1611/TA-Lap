@@ -1,0 +1,298 @@
+@startuml TA-LAP_ERD
+title Entity Relationship Diagram (ERD) — Sistem TA-LAP
+skinparam linetype ortho
+skinparam shadowing false
+skinparam entity {
+  BackgroundColor white
+  BorderColor black
+}
+
+' ============================================================
+' CARA PAKAI:
+' 1. Buka https://www.plantuml.com/plantuml/uml/
+' 2. Copy seluruh isi file ini → paste → Submit
+' 3. Download PNG/SVG untuk skripsi
+'
+' Notasi: * = PK, # = FK, (U) = Unique
+' ============================================================
+
+package "Pengguna & Autentikasi" #EEEEEE {
+
+  entity "User" as user {
+    * **id** : BIGINT <<PK>>
+    --
+    * name : VARCHAR
+    * email : VARCHAR <<U>>
+    * password : VARCHAR
+    phone : VARCHAR
+    city : VARCHAR
+    avatar : VARCHAR
+    email_verified : BOOLEAN
+    * role : ENUM
+    * status : ENUM
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "OwnerVerification" as owner_verification {
+    * **id** : BIGINT <<PK>>
+    --
+    # owner_id : BIGINT <<FK, U>>
+    ktp : VARCHAR
+    foto_usaha : VARCHAR
+    * status : ENUM
+    notes : TEXT
+    * created_at : DATETIME
+  }
+
+  entity "OwnerProfile" as owner_profile {
+    * **id** : BIGINT <<PK>>
+    --
+    # owner_id : BIGINT <<FK, U>>
+    business_name : VARCHAR
+    business_type : VARCHAR
+    business_description : TEXT
+    address : VARCHAR
+    province : VARCHAR
+    postal_code : VARCHAR
+    website : VARCHAR
+    instagram : VARCHAR
+    npwp : VARCHAR
+    bank_code : VARCHAR
+    bank_account_number : VARCHAR
+    bank_account_holder : VARCHAR
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "ActivityLog" as activity_log {
+    * **id** : BIGINT <<PK>>
+    --
+    # user_id : BIGINT <<FK>>
+    activity_type : VARCHAR
+    ip_address : VARCHAR
+    device : VARCHAR
+    * created_at : DATETIME
+  }
+
+  entity "Notifikasi" as notifikasi {
+    * **id** : BIGINT <<PK>>
+    --
+    # user_id : BIGINT <<FK>>
+    * title : VARCHAR
+    * message : TEXT
+    type : VARCHAR
+    link : VARCHAR
+    pesanan_id : BIGINT
+    * is_read : BOOLEAN
+    * created_at : DATETIME
+  }
+}
+
+package "Lapangan & Booking" #E8F4FC {
+
+  entity "JenisOlahraga" as jenis_olahraga {
+    * **id** : INT <<PK>>
+    --
+    * nama : VARCHAR <<U>>
+    icon : VARCHAR
+    * created_at : DATETIME
+  }
+
+  entity "Lapangan" as lapangan {
+    * **id** : BIGINT <<PK>>
+    --
+    # owner_id : BIGINT <<FK>>
+    * nama : VARCHAR
+    # jenis_id : INT <<FK>>
+    kapasitas : INT
+    * indoor : BOOLEAN
+    jumlah_court : INT
+    jam_buka : VARCHAR
+    jam_tutup : VARCHAR
+    * harga : DECIMAL(12,2)
+    gambar : VARCHAR
+    deskripsi : TEXT
+    * status : BOOLEAN
+    alamat : VARCHAR
+    kota : VARCHAR
+    google_maps_url : VARCHAR
+    latitude : DECIMAL(10,8)
+    longitude : DECIMAL(11,8)
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "LapanganImage" as lapangan_image {
+    * **id** : BIGINT <<PK>>
+    --
+    # lapangan_id : BIGINT <<FK>>
+    * image_url : VARCHAR
+  }
+
+  entity "Pesanan" as pesanan {
+    * **id** : BIGINT <<PK>>
+    --
+    * kode_booking : VARCHAR <<U>>
+    # user_id : BIGINT <<FK>>
+    # lapangan_id : BIGINT <<FK>>
+    * tanggal_booking : DATETIME
+    * jam_mulai : DATETIME
+    * jam_selesai : DATETIME
+    catatan : TEXT
+    * total_harga : DECIMAL(12,2)
+    * status : ENUM
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "Pembayaran" as pembayaran {
+    * **id** : BIGINT <<PK>>
+    --
+    # pesanan_id : BIGINT <<FK, U>>
+    * metode : ENUM
+    * total_bayar : INT
+    * bukti_pembayaran : DECIMAL(12,2)
+    * komisi_persen : INT
+    * komisi_platform : INT
+    * pendapatan_owner : INT
+    * status_komisi : ENUM
+    * status_payout_owner : ENUM
+    catatan_settlement : TEXT
+    refund_reason : TEXT
+    * jumlah_refund : INT
+    * jumlah_potongan : INT
+    * status : ENUM
+    tanggal_bayar : DATETIME
+    gateway_order_id : VARCHAR <<U>>
+    snap_token : TEXT
+    gateway_provider : VARCHAR
+    gateway_status : VARCHAR
+    gateway_payment_type : VARCHAR
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+}
+
+package "Keuangan & Setoran" #FFF3E0 {
+
+  entity "SetoranKomisiOwner" as setoran_komisi_owner {
+    * **id** : BIGINT <<PK>>
+    --
+    # owner_id : BIGINT <<FK>>
+    * tahun : INT
+    * bulan : INT
+    * total_komisi : INT
+    * jumlah_transaksi : INT
+    * metode : ENUM
+    bukti_pembayaran : TEXT
+    catatan_owner : TEXT
+    * tanggal_bayar : DATETIME
+    * status : ENUM
+    catatan_admin : TEXT
+    reviewed_by_id : BIGINT
+    reviewed_at : DATETIME
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "SetoranKomisiTunai" as setoran_komisi_tunai {
+    * **id** : BIGINT <<PK>>
+    --
+    * tahun : INT
+    * bulan : INT
+    * total_komisi : INT
+    * total_volume_tunai : INT
+    * jumlah_transaksi : INT
+    * status : ENUM
+    tanggal_setor : DATETIME
+    catatan : TEXT
+    settled_by_id : BIGINT
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "PengeluaranPlatform" as pengeluaran_platform {
+    * **id** : BIGINT <<PK>>
+    --
+    * kategori : ENUM
+    * deskripsi : VARCHAR
+    * jumlah : INT
+    * tanggal : DATETIME
+    * created_at : DATETIME
+  }
+}
+
+package "Pengaturan & Log Sistem" #F3E5F5 {
+
+  entity "Setting" as setting {
+    * **id** : INT <<PK>>
+    --
+    * app_name : VARCHAR
+    app_email : VARCHAR
+    app_phone : VARCHAR
+    logo : VARCHAR
+    favicon : VARCHAR
+    * komisi_persen : DECIMAL(5,2)
+    * batal_potongan_persen : DECIMAL(5,2)
+    * timezone : VARCHAR
+    * language : VARCHAR
+    * maintenance_mode : BOOLEAN
+    * booking_notification : BOOLEAN
+    * owner_notification : BOOLEAN
+    * payment_notification : BOOLEAN
+    * backup_notification : BOOLEAN
+    * login_notification : BOOLEAN
+    * auto_payout_enabled : BOOLEAN
+    platform_bank_code : VARCHAR
+    platform_bank_account_number : VARCHAR
+    platform_bank_account_holder : VARCHAR
+    platform_ewallet_note : VARCHAR
+  }
+
+  entity "BackupLog" as backup_log {
+    * **id** : BIGINT <<PK>>
+    --
+    * file_name : VARCHAR
+    size : VARCHAR
+    status : ENUM
+    * created_at : DATETIME
+  }
+
+  entity "MonthlyStatistic" as monthly_statistic {
+    * **id** : BIGINT <<PK>>
+    --
+    * month : INT
+    * year : INT
+    * total_booking : INT
+    * total_income : DECIMAL(12,2)
+    * created_at : DATETIME
+  }
+}
+
+' --- Relasi (Foreign Key) ---
+user ||--o| owner_verification : "1 : 0..1"
+user ||--o| owner_profile : "1 : 0..1"
+user ||--o{ activity_log : "1 : N"
+user ||--o{ notifikasi : "1 : N"
+user ||--o{ lapangan : "1 : N (owner)"
+user ||--o{ pesanan : "1 : N"
+user ||--o{ setoran_komisi_owner : "1 : N"
+
+jenis_olahraga ||--o{ lapangan : "1 : N"
+lapangan ||--o{ lapangan_image : "1 : N"
+lapangan ||--o{ pesanan : "1 : N"
+
+pesanan ||--|| pembayaran : "1 : 0..1"
+
+note bottom of setting
+  Tabel standalone (singleton id=1)
+  Tidak berelasi FK ke tabel lain
+end note
+
+note bottom of setoran_komisi_tunai
+  Agregat bulanan platform
+  Tidak berelasi FK formal
+end note
+
+@enduml
