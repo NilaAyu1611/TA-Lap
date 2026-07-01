@@ -1,0 +1,363 @@
+@startuml TA-LAP_Class_Diagram
+title Class Diagram Sistem TA-LAP
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+}
+
+' ============================================================
+' CARA PAKAI:
+' 1. Buka https://www.plantuml.com/plantuml/uml/
+' 2. Copy seluruh isi file ini → paste → Submit
+' 3. Download PNG/SVG untuk skripsi
+' ============================================================
+
+enum Role <<enumeration>> {
+  admin
+  owner
+  user
+}
+
+enum StatusUser <<enumeration>> {
+  active
+  pending
+  blocked
+  suspended
+}
+
+enum StatusOwner <<enumeration>> {
+  pending
+  approved
+  rejected
+}
+
+enum StatusPesanan <<enumeration>> {
+  pending
+  dibayar
+  selesai
+  dibatalkan
+  expired
+}
+
+enum StatusPembayaran <<enumeration>> {
+  menunggu
+  sukses
+  gagal
+  refund
+}
+
+enum StatusKomisi <<enumeration>> {
+  terpotong
+  belum_lunas
+  lunas
+}
+
+enum StatusPayoutOwner <<enumeration>> {
+  menunggu
+  dicairkan
+}
+
+enum MetodePembayaran <<enumeration>> {
+  transfer
+  qris
+  cash
+  ewallet
+}
+
+enum KategoriPengeluaran <<enumeration>> {
+  operasional
+  refund_manual
+  marketing
+  lainnya
+}
+
+enum StatusSetoranKomisi <<enumeration>> {
+  menunggu
+  disetor
+}
+
+enum StatusPengajuanSetoran <<enumeration>> {
+  menunggu_verifikasi
+  disetujui
+  ditolak
+}
+
+enum MetodeSetoranKomisi <<enumeration>> {
+  transfer
+  ewallet
+}
+
+enum BackupStatus <<enumeration>> {
+  success
+  failed
+}
+
+class User {
+  +id: BigInt
+  +name: String
+  +email: String
+  +password: String
+  +phone: String
+  +city: String
+  +avatar: String
+  +email_verified: Boolean
+  +role: Role
+  +status: StatusUser
+  +created_at: DateTime
+  +updated_at: DateTime
+}
+
+class OwnerVerification {
+  +id: BigInt
+  +owner_id: BigInt
+  +ktp: String
+  +foto_usaha: String
+  +status: StatusOwner
+  +notes: String
+  +created_at: DateTime
+}
+
+class OwnerProfile {
+  +id: BigInt
+  +owner_id: BigInt
+  +business_name: String
+  +business_type: String
+  +business_description: Text
+  +address: String
+  +province: String
+  +postal_code: String
+  +website: String
+  +instagram: String
+  +npwp: String
+  +bank_code: String
+  +bank_account_number: String
+  +bank_account_holder: String
+  +created_at: DateTime
+  +updated_at: DateTime
+}
+
+class ActivityLog {
+  +id: BigInt
+  +user_id: BigInt
+  +activity_type: String
+  +ip_address: String
+  +device: String
+  +created_at: DateTime
+}
+
+class Notifikasi {
+  +id: BigInt
+  +user_id: BigInt
+  +title: String
+  +message: String
+  +type: String
+  +link: String
+  +pesanan_id: BigInt
+  +is_read: Boolean
+  +created_at: DateTime
+}
+
+class JenisOlahraga {
+  +id: Int
+  +nama: String
+  +icon: String
+  +created_at: DateTime
+}
+
+class Lapangan {
+  +id: BigInt
+  +owner_id: BigInt
+  +nama: String
+  +jenis_id: Int
+  +kapasitas: Int
+  +indoor: Boolean
+  +jumlah_court: Int
+  +jam_buka: String
+  +jam_tutup: String
+  +harga: Decimal
+  +gambar: String
+  +deskripsi: String
+  +status: Boolean
+  +alamat: String
+  +kota: String
+  +google_maps_url: String
+  +latitude: Decimal
+  +longitude: Decimal
+  +created_at: DateTime
+  +updated_at: DateTime
+}
+
+class LapanganImage {
+  +id: BigInt
+  +lapangan_id: BigInt
+  +image_url: String
+}
+
+class Pesanan {
+  +id: BigInt
+  +kode_booking: String
+  +user_id: BigInt
+  +lapangan_id: BigInt
+  +tanggal_booking: DateTime
+  +jam_mulai: DateTime
+  +jam_selesai: DateTime
+  +catatan: String
+  +total_harga: Decimal
+  +status: StatusPesanan
+  +created_at: DateTime
+  +updated_at: DateTime
+}
+
+class Pembayaran {
+  +id: BigInt
+  +pesanan_id: BigInt
+  +metode: MetodePembayaran
+  +total_bayar: Int
+  +bukti_pembayaran: Decimal
+  +komisi_persen: Int
+  +komisi_platform: Int
+  +pendapatan_owner: Int
+  +status_komisi: StatusKomisi
+  +status_payout_owner: StatusPayoutOwner
+  +catatan_settlement: String
+  +refund_reason: String
+  +jumlah_refund: Int
+  +jumlah_potongan: Int
+  +status: StatusPembayaran
+  +tanggal_bayar: DateTime
+  +gateway_order_id: String
+  +snap_token: Text
+  +gateway_provider: String
+  +gateway_status: String
+  +gateway_payment_type: String
+  +created_at: DateTime
+  +updated_at: DateTime
+}
+
+class Setting {
+  +id: Int
+  +app_name: String
+  +app_email: String
+  +app_phone: String
+  +logo: String
+  +favicon: String
+  +komisi_persen: Decimal
+  +batal_potongan_persen: Decimal
+  +timezone: String
+  +language: String
+  +maintenance_mode: Boolean
+  +booking_notification: Boolean
+  +owner_notification: Boolean
+  +payment_notification: Boolean
+  +backup_notification: Boolean
+  +login_notification: Boolean
+  +auto_payout_enabled: Boolean
+  +platform_bank_code: String
+  +platform_bank_account_number: String
+  +platform_bank_account_holder: String
+  +platform_ewallet_note: String
+}
+
+class BackupLog {
+  +id: BigInt
+  +file_name: String
+  +size: String
+  +status: BackupStatus
+  +created_at: DateTime
+}
+
+class MonthlyStatistic {
+  +id: BigInt
+  +month: Int
+  +year: Int
+  +total_booking: Int
+  +total_income: Decimal
+  +created_at: DateTime
+}
+
+class PengeluaranPlatform {
+  +id: BigInt
+  +kategori: KategoriPengeluaran
+  +deskripsi: String
+  +jumlah: Int
+  +tanggal: DateTime
+  +created_at: DateTime
+}
+
+class SetoranKomisiTunai {
+  +id: BigInt
+  +tahun: Int
+  +bulan: Int
+  +total_komisi: Int
+  +total_volume_tunai: Int
+  +jumlah_transaksi: Int
+  +status: StatusSetoranKomisi
+  +tanggal_setor: DateTime
+  +catatan: String
+  +settled_by_id: BigInt
+  +created_at: DateTime
+  +updated_at: DateTime
+}
+
+class SetoranKomisiOwner {
+  +id: BigInt
+  +owner_id: BigInt
+  +tahun: Int
+  +bulan: Int
+  +total_komisi: Int
+  +jumlah_transaksi: Int
+  +metode: MetodeSetoranKomisi
+  +bukti_pembayaran: Text
+  +catatan_owner: String
+  +tanggal_bayar: DateTime
+  +status: StatusPengajuanSetoran
+  +catatan_admin: String
+  +reviewed_by_id: BigInt
+  +reviewed_at: DateTime
+  +created_at: DateTime
+  +updated_at: DateTime
+}
+
+' --- Relasi ---
+User "1" -- "0..1" OwnerVerification : diverifikasi
+User "1" -- "0..1" OwnerProfile : memiliki profil
+User "1" -- "*" ActivityLog : aktivitas
+User "1" -- "*" Notifikasi : menerima
+User "1" -- "*" Lapangan : memiliki (owner)
+User "1" -- "*" Pesanan : membooking
+User "1" -- "*" SetoranKomisiOwner : mengajukan
+
+JenisOlahraga "1" -- "*" Lapangan : kategori
+Lapangan "1" -- "*" LapanganImage : foto
+Lapangan "1" -- "*" Pesanan : dipesan
+
+Pesanan "1" -- "0..1" Pembayaran : dibayar
+
+User ..> Role
+User ..> StatusUser
+OwnerVerification ..> StatusOwner
+Pesanan ..> StatusPesanan
+Pembayaran ..> MetodePembayaran
+Pembayaran ..> StatusPembayaran
+Pembayaran ..> StatusKomisi
+Pembayaran ..> StatusPayoutOwner
+PengeluaranPlatform ..> KategoriPengeluaran
+SetoranKomisiTunai ..> StatusSetoranKomisi
+SetoranKomisiOwner ..> MetodeSetoranKomisi
+SetoranKomisiOwner ..> StatusPengajuanSetoran
+BackupLog ..> BackupStatus
+
+note right of Setting
+  Singleton (id=1)
+  Konfigurasi platform
+end note
+
+note right of SetoranKomisiTunai
+  Agregat komisi cash
+  per bulan (platform)
+end note
+
+@enduml
