@@ -50,6 +50,17 @@ enum StatusPembayaran {
   refund
 }
 
+enum StatusKomisi {
+  terpotong
+  belum_lunas
+  lunas
+}
+
+enum StatusPayoutOwner {
+  menunggu
+  dicairkan
+}
+
 enum MetodePembayaran {
   transfer
   qris
@@ -62,6 +73,29 @@ enum BackupStatus {
   failed
 }
 
+enum KategoriPengeluaran {
+  operasional
+  refund_manual
+  marketing
+  lainnya
+}
+
+enum StatusSetoranKomisi {
+  menunggu
+  disetor
+}
+
+enum StatusPengajuanSetoran {
+  menunggu_verifikasi
+  disetujui
+  ditolak
+}
+
+enum MetodeSetoranKomisi {
+  transfer
+  ewallet
+}
+
 //////////////////////
 // MODEL
 //////////////////////
@@ -70,21 +104,57 @@ model User {
   id             BigInt             @id @default(autoincrement())
   name           String
   email          String             @unique
-  password       String
+  password       String?
+  google_id      String?            @unique
+  auth_provider  String             @default("local")
   phone          String?
   city           String?
   avatar         String?
   verification   OwnerVerification?
+  ownerProfile   OwnerProfile?
   email_verified Boolean            @default(false)
   role           Role               @default(user)
   status         StatusUser         @default(active)
   created_at     DateTime           @default(now())
   updated_at     DateTime           @updatedAt
 
-  lapangans     Lapangan[]    @relation("OwnerLapangan")
-  pesanans      Pesanan[]
-  logs          ActivityLog[]
-  notifications Notifikasi[]
+  lapangans           Lapangan[]           @relation("OwnerLapangan")
+  pesanans            Pesanan[]
+  logs                ActivityLog[]
+  notifications       Notifikasi[]
+  setoranKomisi       SetoranKomisiOwner[]
+  passwordResetTokens PasswordResetToken[]
+  pushSubscriptions   PushSubscription[]
+}
+
+model PasswordResetToken {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  token      String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("password_reset_tokens")
+}
+
+model PushSubscription {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  endpoint   String   @db.Text
+  p256dh     String
+  auth       String
+  user_agent String?  @db.VarChar(512)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("push_subscriptions")
 }
 
 model JenisOlahraga {
@@ -150,16 +220,29 @@ model Pesanan {
 }
 
 model Pembayaran {
-  id               BigInt           @id @default(autoincrement())
-  pesanan_id       BigInt           @unique
-  metode           MetodePembayaran
-  total_bayar      Int
-  bukti_pembayaran Decimal          @db.Decimal(12, 2)
-  refund_reason    String?
-  status           StatusPembayaran @default(menunggu)
-  tanggal_bayar    DateTime?
-  created_at       DateTime         @default(now())
-  updated_at       DateTime         @updatedAt
+  id                   BigInt            @id @default(autoincrement())
+  pesanan_id           BigInt            @unique
+  metode               MetodePembayaran
+  total_bayar          Int
+  bukti_pembayaran     Decimal           @db.Decimal(12, 2)
+  komisi_persen        Int               @default(5)
+  komisi_platform      Int               @default(0)
+  pendapatan_owner     Int               @default(0)
+  status_komisi        StatusKomisi      @default(terpotong)
+  status_payout_owner  StatusPayoutOwner @default(menunggu)
+  catatan_settlement   String?
+  refund_reason        String?
+  jumlah_refund        Int               @default(0)
+  jumlah_potongan      Int               @default(0)
+  status               StatusPembayaran  @default(menunggu)
+  tanggal_bayar        DateTime?
+  gateway_order_id     String?           @unique
+  snap_token           String?           @db.Text
+  gateway_provider     String?
+  gateway_status       String?
+  gateway_payment_type String?
+  created_at           DateTime          @default(now())
+  updated_at           DateTime          @updatedAt
 
   pesanan Pesanan @relation(fields: [pesanan_id], references: [id])
 }
@@ -174,6 +257,27 @@ model OwnerVerification {
   created_at DateTime    @default(now())
 
   owner User @relation(fields: [owner_id], references: [id])
+}
+
+model OwnerProfile {
+  id                   BigInt   @id @default(autoincrement())
+  owner_id             BigInt   @unique
+  business_name        String?
+  business_type        String?
+  business_description String?  @db.Text
+  address              String?
+  province             String?
+  postal_code          String?
+  website              String?
+  instagram            String?
+  npwp                 String?
+  bank_code            String?
+  bank_account_number  String?
+  bank_account_holder  String?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  owner User @relation(fields: [owner_id], references: [id], onDelete: Cascade)
 }
 
 model ActivityLog {
@@ -194,11 +298,21 @@ model Setting {
   app_phone            String?
   logo                 String?
   favicon              String?
+  komisi_persen        Decimal @default(5) @db.Decimal(5, 2)
+  batal_potongan_persen Decimal @default(25) @db.Decimal(5, 2)
+  timezone             String  @default("Asia/Jakarta")
+  language             String  @default("id")
   maintenance_mode     Boolean @default(false)
   booking_notification Boolean @default(true)
   owner_notification   Boolean @default(true)
   payment_notification Boolean @default(true)
   backup_notification  Boolean @default(true)
+  login_notification   Boolean @default(true)
+  auto_payout_enabled  Boolean @default(true)
+  platform_bank_code            String?
+  platform_bank_account_number  String?
+  platform_bank_account_holder  String?
+  platform_ewallet_note         String?
 }
 
 model BackupLog {
@@ -214,10 +328,16 @@ model Notifikasi {
   user_id    BigInt
   title      String
   message    String
+  type       String?
+  link       String?
+  pesanan_id BigInt?
   is_read    Boolean  @default(false)
   created_at DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, is_read])
+  @@index([pesanan_id, type])
 }
 
 model MonthlyStatistic {
@@ -227,4 +347,56 @@ model MonthlyStatistic {
   total_booking Int
   total_income  Decimal  @db.Decimal(12, 2)
   created_at    DateTime @default(now())
+}
+
+model PengeluaranPlatform {
+  id         BigInt              @id @default(autoincrement())
+  kategori   KategoriPengeluaran @default(operasional)
+  deskripsi  String
+  jumlah     Int
+  tanggal    DateTime            @default(now())
+  created_at DateTime            @default(now())
+}
+
+model SetoranKomisiTunai {
+  id                 BigInt              @id @default(autoincrement())
+  tahun              Int
+  bulan              Int
+  total_komisi       Int                 @default(0)
+  total_volume_tunai Int                 @default(0)
+  jumlah_transaksi   Int                 @default(0)
+  status             StatusSetoranKomisi @default(menunggu)
+  tanggal_setor      DateTime?
+  catatan            String?
+  settled_by_id      BigInt?
+  created_at         DateTime            @default(now())
+  updated_at         DateTime            @updatedAt
+
+  @@unique([tahun, bulan])
+  @@map("setoran_komisi_tunai")
+}
+
+model SetoranKomisiOwner {
+  id               BigInt                 @id @default(autoincrement())
+  owner_id         BigInt
+  tahun            Int
+  bulan            Int
+  total_komisi     Int
+  jumlah_transaksi Int
+  metode           MetodeSetoranKomisi
+  bukti_pembayaran String?                @db.Text
+  catatan_owner    String?
+  tanggal_bayar    DateTime
+  status           StatusPengajuanSetoran @default(menunggu_verifikasi)
+  catatan_admin    String?
+  reviewed_by_id   BigInt?
+  reviewed_at      DateTime?
+  created_at       DateTime               @default(now())
+  updated_at       DateTime               @updatedAt
+
+  owner User @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+
+  @@unique([owner_id, tahun, bulan])
+  @@index([status, tahun, bulan])
+  @@map("setoran_komisi_owner")
 }
