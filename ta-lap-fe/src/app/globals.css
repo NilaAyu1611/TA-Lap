@@ -2,6 +2,12 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme inline {
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-plus-jakarta),
+    ui-sans-serif, system-ui, sans-serif;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -29,9 +35,101 @@ html.dark {
 body {
   background: var(--background);
   color: var(--foreground);
-    transition:
+  font-family: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  transition:
     background 0.3s ease,
     color 0.3s ease;
-    
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Form controls — dark mode native picker/dropdown */
+html.dark select,
+html.dark input[type="time"],
+html.dark input[type="date"],
+html.dark input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+html.dark select option {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
+/* ── Laporan print (admin & owner) ── */
+@media print {
+  @page {
+    margin: 10mm 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #171717 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-print-hide],
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .admin-print-content {
+    margin-left: 0 !important;
+  }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .laporan-print,
+  .owner-laporan-print {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  .laporan-print *,
+  .owner-laporan-print * {
+    visibility: visible !important;
+    color: inherit;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .laporan-print .text-gray-500,
+  .laporan-print .text-gray-600,
+  .owner-laporan-print .text-gray-500,
+  .owner-laporan-print .text-gray-600 {
+    color: #4b5563 !important;
+  }
+
+  .laporan-print [class*="rounded"],
+  .laporan-print table,
+  .owner-laporan-print [class*="rounded"],
+  .owner-laporan-print table {
+    background-color: #fff !important;
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+  }
+
+  .laporan-print h1,
+  .laporan-print h2,
+  .laporan-print h3,
+  .owner-laporan-print h1,
+  .owner-laporan-print h2,
+  .owner-laporan-print h3 {
+    color: #111827 !important;
+  }
+}
+
+html.printing-laporan [data-print-hide] {
+  display: none !important;
+}
+
+html.printing-laporan .admin-print-content {
+  margin-left: 0 !important;
 }

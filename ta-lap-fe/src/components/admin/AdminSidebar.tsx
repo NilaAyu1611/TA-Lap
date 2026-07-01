@@ -308,6 +308,7 @@ import {
 } from "lucide-react";
 
 import { usePathname } from "next/navigation";
+import BrandLogo from "@/components/BrandLogo";
 import { handleLogout } from "@/lib/auth";
 
 interface AdminSidebarProps {
@@ -374,6 +375,7 @@ export default function AdminSidebar({
       {/* OVERLAY */}
       {mobileOpen && (
         <div
+          data-print-hide
           onClick={() => setMobileOpen(false)}
           className="
             fixed
@@ -388,6 +390,7 @@ export default function AdminSidebar({
 
       {/* SIDEBAR */}
       <aside
+        data-print-hide
         className={`
           fixed
           top-0
@@ -397,11 +400,13 @@ export default function AdminSidebar({
           h-screen
 
           border-r
-          border-gray-200
+          border-slate-200/90
           dark:border-white/10
 
-          bg-white
+          bg-slate-50
+          shadow-[1px_0_0_rgba(0,0,0,0.02)]
           dark:bg-[#020817]
+          dark:shadow-none
 
           transition-all
           duration-300
@@ -430,47 +435,31 @@ export default function AdminSidebar({
               justify-between
 
               border-b
-              border-gray-200
+              border-slate-200/90
+              bg-white
               dark:border-white/10
+              dark:bg-transparent
 
               p-6
             "
           >
-            {/* LOGO */}
-            <div
-              className={`
-                overflow-hidden
-                transition-all
-                duration-300
+            {/* LOGO — full when expanded */}
+            <BrandLogo
+              href="/admin/dashboard"
+              subtitle="Admin Panel"
+              accent="cyan"
+              className={collapsed ? "lg:hidden" : ""}
+            />
 
-                ${
-                  collapsed
-                    ? "lg:w-0 lg:opacity-0"
-                    : "w-auto opacity-100"
-                }
-              `}
-            >
-              <h2
-                className="
-                  whitespace-nowrap
-                  text-xl
-                  font-black
-                  text-cyan-500
-                "
-              >
-                ADMIN PANEL
-              </h2>
-
-              <p
-                className="
-                  whitespace-nowrap
-                  text-sm
-                  text-gray-500
-                "
-              >
-                Super Management
-              </p>
-            </div>
+            {/* LOGO — mark only when collapsed (desktop) */}
+            {collapsed && (
+              <BrandLogo
+                href="/admin/dashboard"
+                accent="cyan"
+                hideWord
+                className="hidden lg:flex"
+              />
+            )}
 
             {/* DESKTOP TOGGLE */}
             <button
@@ -490,8 +479,13 @@ export default function AdminSidebar({
                 rounded-2xl
 
                 border
-                border-gray-200
+                border-slate-200
+                bg-white
+                text-slate-600
+                hover:bg-slate-50
                 dark:border-white/10
+                dark:bg-transparent
+                dark:text-white
               "
             >
               {collapsed ? (
@@ -553,11 +547,11 @@ export default function AdminSidebar({
                         text-white
                       `
                       : `
-                        text-gray-600
+                        text-slate-600
                         dark:text-gray-300
 
                         hover:bg-cyan-500/10
-                        hover:text-cyan-500
+                        hover:text-cyan-600
                       `
                   }
                 `}

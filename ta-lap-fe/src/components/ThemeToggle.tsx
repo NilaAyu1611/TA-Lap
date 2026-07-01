@@ -1,121 +1,49 @@
-// "use client";
-
-// import { Moon, Sun } from "lucide-react";
-// import { useTheme } from "next-themes";
-// import { useEffect, useState } from "react";
-
-// export default function ThemeToggle() {
-//   const { resolvedTheme, setTheme } = useTheme();
-
-//   const [mounted, setMounted] = useState(false);
-
-//   useEffect(() => {
-//     setMounted(true);
-//   }, []);
-
-//   // Hindari hydration mismatch
-//   if (!mounted) {
-//     return (
-//       <button
-//         className="
-//           rounded-xl
-//           border
-//           border-cyan-400
-//           p-2
-//         "
-//       >
-//         <Sun size={20} />
-//       </button>
-//     );
-//   }
-
-//   return (
-//     <button
-//       onClick={() =>
-//         setTheme(resolvedTheme === "dark" ? "light" : "dark")
-//       }
-//       className="
-//         rounded-xl
-//         border
-//         border-cyan-400
-//         p-2
-//         transition
-//         hover:bg-cyan-400
-//         hover:text-black
-//       "
-//     >
-//       {resolvedTheme === "dark" ? (
-//         <Sun size={20} />
-//       ) : (
-//         <Moon size={20} />
-//       )}
-//     </button>
-//   );
-// }
-
-// "use client";
-
-// export default function ThemeToggle() {
-//   const toggleTheme = () => {
-//     document.documentElement.classList.toggle("dark");
-//   };
-
-//   return (
-//     <button onClick={toggleTheme}>
-//       Toggle Theme
-//     </button>
-//   );
-// }
-
 "use client";
 
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { getStoredTheme, toggleTheme as switchTheme } from "@/lib/theme";
 
 export default function ThemeToggle() {
   const [darkMode, setDarkMode] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-
-    if (savedTheme === "dark") {
-      document.documentElement.classList.add("dark");
-      setDarkMode(true);
-    }
+    setDarkMode(getStoredTheme() === "dark");
+    setMounted(true);
   }, []);
 
-  const toggleTheme = () => {
-    const html = document.documentElement;
-
-    if (darkMode) {
-      html.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    } else {
-      html.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    }
-
-    setDarkMode(!darkMode);
+  const handleToggle = () => {
+    const next = switchTheme();
+    setDarkMode(next === "dark");
   };
+
+  if (!mounted) {
+    return (
+      <button
+        type="button"
+        aria-label="Toggle tema"
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 dark:border-white/10 dark:bg-white/5"
+      >
+        <Sun size={18} />
+      </button>
+    );
+  }
 
   return (
     <button
-      onClick={toggleTheme}
+      type="button"
+      onClick={handleToggle}
+      aria-label={darkMode ? "Aktifkan mode terang" : "Aktifkan mode gelap"}
       className="
-        rounded-xl
-        border
-        border-cyan-400
-        p-2
-        transition
-        hover:bg-cyan-400
-        hover:text-black
+        flex h-10 w-10 items-center justify-center rounded-xl border
+        border-gray-200 bg-white text-gray-600 shadow-sm transition
+        hover:border-cyan-300 hover:text-cyan-600
+        dark:border-white/10 dark:bg-white/5 dark:text-gray-300
+        dark:hover:border-cyan-400/40 dark:hover:text-cyan-400
       "
     >
-      {darkMode ? (
-        <Sun size={20} />
-      ) : (
-        <Moon size={20} />
-      )}
+      {darkMode ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
 }

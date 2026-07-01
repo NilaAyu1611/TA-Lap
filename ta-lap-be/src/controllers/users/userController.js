@@ -1,5 +1,10 @@
 import bcrypt from "bcryptjs";
 import prisma from "../../config/prisma.js";
+import {
+  findCustomerByPhone,
+  normalizePhone,
+  formatDisplayEmail,
+} from "../../services/walkInCustomerService.js";
 
 const serialize = (data) =>
   JSON.parse(
@@ -33,6 +38,84 @@ const userInclude = {
       pembayaran: true,
     },
   },
+};
+
+const formatCustomerSearch = (user) => ({
+  id: String(user.id),
+  name: user.name,
+  email: formatDisplayEmail(user.email),
+  phone: user.phone,
+  city: user.city,
+});
+
+/** Lookup pelanggan by nomor telepon (autofill walk-in). */
+export const lookupCustomerByPhone = async (req, res) => {
+  try {
+    const phone = String(req.query.phone || "").trim();
+    if (!phone) {
+      return res.status(400).json({ message: "Nomor telepon wajib diisi" });
+    }
+
+    const user = await findCustomerByPhone(phone);
+    if (!user) {
+      return res.json({ data: null, message: "Pelanggan baru — belum terdaftar" });
+    }
+
+    const email = formatDisplayEmail(user.email) || "";
+
+    res.json(
+      serialize({
+        data: {
+          id: String(user.id),
+          name: user.name,
+          phone: user.phone,
+          email,
+        },
+        message: "Pelanggan sudah pernah terdaftar",
+      })
+    );
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/** Cari pelanggan (role user) untuk booking walk-in owner/admin. */
+export const searchCustomers = async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    if (q.length < 2) {
+      return res.json({ data: [] });
+    }
+
+    const phoneNorm = normalizePhone(q);
+    const phoneSuffix = phoneNorm?.slice(-10);
+
+    const users = await prisma.user.findMany({
+      where: {
+        role: "user",
+        status: "active",
+        OR: [
+          { name: { contains: q } },
+          { email: { contains: q } },
+          { phone: { contains: q } },
+          ...(phoneSuffix ? [{ phone: { endsWith: phoneSuffix } }] : []),
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        city: true,
+      },
+      orderBy: { name: "asc" },
+      take: 20,
+    });
+
+    res.json(serialize({ data: users.map(formatCustomerSearch) }));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // GET ALL USERS

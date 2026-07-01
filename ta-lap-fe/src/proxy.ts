@@ -7,7 +7,7 @@ const protectedRoutes: Record<string, string[]> = {
   "/user": ["user"],
 };
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const matchedPrefix = Object.keys(protectedRoutes).find((prefix) =>

@@ -1,490 +1,512 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
-import { Search, Filter, Star } from "lucide-react";
+
+import { useEffect, useMemo, useState } from "react";
+
+import { LayoutGrid, Map } from "lucide-react";
+
+
+
 import UserNavbar from "@/components/UserNavbar";
-import { getLapangan } from "@/services/lapangan.service";
-import { createPesanan } from "@/services/pesanan.service";
-import { formatRupiah } from "@/lib/auth";
 
-type LapanganItem = {
-  id: string;
-  nama: string;
-  harga: number | string;
-  status: boolean;
-  gambar?: string;
-  jenis?: { nama: string };
-};
+import LapanganMapsSearch, {
+
+  LapanganSearchApply,
+
+  LocationFilter,
+
+} from "@/components/user/lapangan/LapanganMapsSearch";
+
+import LapanganMapBrowse from "@/components/user/lapangan/LapanganMapBrowse";
+
+import UserLapanganCard from "@/components/user/lapangan/UserLapanganCard";
+
+import { distanceKm } from "@/lib/geo";
+
+import { getLapangan } from "@/services/lapangan.service";
+
+import { Lapangan } from "@/types/lapangan";
+
+
+
+type ViewMode = "grid" | "map";
+
+
 
 export default function LapanganPage() {
-  const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [lapangans, setLapangans] = useState<LapanganItem[]>([]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [keywordFilter, setKeywordFilter] = useState("");
+
+  const [jenisFilter, setJenisFilter] = useState<string>("all");
+
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>({
+
+    center: null,
+
+    radiusKm: 25,
+
+  });
+
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+
+  const [mapSelectedId, setMapSelectedId] = useState<string | null>(null);
+
+  const [lapangans, setLapangans] = useState<Lapangan[]>([]);
+
   const [loading, setLoading] = useState(true);
-  const [bookingId, setBookingId] = useState<string | null>(null);
+
+
 
   useEffect(() => {
+
     const fetchData = async () => {
+
       try {
+
         const result = await getLapangan();
+
         setLapangans(result.data || []);
+
       } catch (error) {
+
         console.error(error);
+
       } finally {
+
         setLoading(false);
+
       }
+
     };
+
     fetchData();
+
   }, []);
 
-  const handleBooking = async (lapanganId: string) => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tanggal = tomorrow.toISOString().split("T")[0];
-    const jamMulai = new Date(`${tanggal}T16:00:00`);
-    const jamSelesai = new Date(`${tanggal}T18:00:00`);
 
-    try {
-      setBookingId(lapanganId);
-      await createPesanan({
-        lapangan_id: lapanganId,
-        tanggal_booking: tanggal,
-        jam_mulai: jamMulai.toISOString(),
-        jam_selesai: jamSelesai.toISOString(),
-      });
-      router.push("/user/pesanan");
-    } catch (error) {
-      console.error(error);
-      alert("Gagal membuat pesanan. Pastikan sudah login.");
-    } finally {
-      setBookingId(null);
+
+  const jenisOptions = useMemo(() => {
+
+    const set = new Set<string>();
+
+    lapangans.forEach((l) => {
+
+      if (l.jenis) set.add(l.jenis);
+
+    });
+
+    return Array.from(set).sort();
+
+  }, [lapangans]);
+
+
+
+  const handleSearchApply = (state: LapanganSearchApply) => {
+
+    setSearchQuery(state.query);
+
+    setKeywordFilter(state.keywords);
+
+    setLocationFilter({
+
+      center: state.center,
+
+      radiusKm: state.radiusKm,
+
+    });
+
+    if (state.jenis && state.jenis !== "all") {
+
+      setJenisFilter(state.jenis);
+
+    } else if (!state.query.trim()) {
+
+      setJenisFilter("all");
+
     }
+
   };
 
-  const filtered = lapangans.filter((item) =>
-    item.nama.toLowerCase().includes(search.toLowerCase())
-  );
+
+
+  const filtered = useMemo(() => {
+
+    const q = keywordFilter.toLowerCase().trim();
+
+
+
+    return lapangans
+
+      .map((item) => {
+
+        let distanceKmVal: number | null = null;
+
+        if (
+
+          locationFilter.center &&
+
+          item.latitude != null &&
+
+          item.longitude != null
+
+        ) {
+
+          distanceKmVal = distanceKm(
+
+            locationFilter.center.lat,
+
+            locationFilter.center.lng,
+
+            item.latitude,
+
+            item.longitude
+
+          );
+
+        }
+
+        return { ...item, distanceKm: distanceKmVal };
+
+      })
+
+      .filter((item) => {
+
+        const matchSearch =
+
+          !q ||
+
+          item.nama.toLowerCase().includes(q) ||
+
+          (item.jenis || "").toLowerCase().includes(q) ||
+
+          (item.kota || "").toLowerCase().includes(q) ||
+
+          (item.alamat || "").toLowerCase().includes(q);
+
+        const matchJenis =
+
+          jenisFilter === "all" || item.jenis === jenisFilter;
+
+        const matchRadius =
+
+          !locationFilter.center ||
+
+          (item.distanceKm != null &&
+
+            item.distanceKm <= locationFilter.radiusKm);
+
+        return matchSearch && matchJenis && matchRadius;
+
+      })
+
+      .sort((a, b) => {
+
+        if (locationFilter.center) {
+
+          if (a.distanceKm == null && b.distanceKm == null) return 0;
+
+          if (a.distanceKm == null) return 1;
+
+          if (b.distanceKm == null) return -1;
+
+          return a.distanceKm - b.distanceKm;
+
+        }
+
+        return a.nama.localeCompare(b.nama);
+
+      });
+
+  }, [lapangans, keywordFilter, jenisFilter, locationFilter]);
+
+
+
+  useEffect(() => {
+
+    if (filtered.length > 0 && !mapSelectedId) {
+
+      setMapSelectedId(filtered[0].id);
+
+    }
+
+  }, [filtered, mapSelectedId]);
+
+
 
   return (
-    <main
-      className="
-        min-h-screen
 
-        bg-gray-50
-        text-gray-900
+    <main className="min-h-screen bg-gray-50 text-gray-900 transition-all duration-300 dark:bg-[#0b1120] dark:text-white">
 
-        transition-all
-        duration-300
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
 
-        dark:bg-[#0b1120]
-        dark:text-white
-      "
-    >
-      {/* BACKGROUND */}
-      <div
-        className="
-          pointer-events-none
-          fixed
-          inset-0
-          overflow-hidden
-        "
-      >
-        <div
-          className="
-            absolute
-            left-[-120px]
-            top-[-120px]
+        <div className="absolute left-[-120px] top-[-120px] h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl" />
 
-            h-80
-            w-80
+        <div className="absolute bottom-[-120px] right-[-120px] h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
 
-            rounded-full
-            bg-cyan-500/10
-
-            blur-3xl
-          "
-        />
-
-        <div
-          className="
-            absolute
-            bottom-[-120px]
-            right-[-120px]
-
-            h-80
-            w-80
-
-            rounded-full
-            bg-blue-500/10
-
-            blur-3xl
-          "
-        />
       </div>
 
-      {/* NAVBAR */}
+
+
       <UserNavbar active="lapangan" />
 
-      {/* CONTENT */}
-      <section className="relative z-10 mx-auto max-w-7xl px-6 py-10">
-        {/* TOP */}
-        <div
-          className="
-            flex
-            flex-col
-            gap-6
 
-            lg:flex-row
-            lg:items-center
-            lg:justify-between
-          "
-        >
-          <div>
-            <h1
-              className="
-                text-4xl
-                font-bold
-                tracking-tight
-              "
-            >
-              Daftar Lapangan
-            </h1>
 
-            <p
-              className="
-                mt-3
-                max-w-2xl
+      <section className="relative z-10 mx-auto max-w-7xl px-4 py-8 sm:px-6">
 
-                text-sm
-                leading-7
+        <div className="max-w-3xl">
 
-                text-gray-500
-                dark:text-gray-400
-              "
-            >
-              Pilih lapangan favorit Anda untuk booking
-              realtime dengan sistem modern dan cepat.
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
 
-          {/* SEARCH */}
-          <div
-            className="
-              flex
-              w-full
-              flex-col
-              gap-3
+            Cari Lapangan
 
-              sm:flex-row
-              lg:w-auto
-            "
-          >
-            <div className="relative">
-              <Search
-                size={18}
-                className="
-                  absolute
-                  left-4
-                  top-1/2
-                  -translate-y-1/2
+          </h1>
 
-                  text-gray-400
-                "
-              />
+          <p className="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+            Cari venue berdasarkan jenis olahraga, nama, atau kota. Lokasi
+            perangkat dipakai untuk menghitung jarak dan radius tampilan.
+          </p>
 
-              <input
-                type="text"
-                placeholder="Cari lapangan..."
-                value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
-                className="
-                  w-full
-                  rounded-2xl
-                  border
-
-                  border-gray-300
-                  dark:border-white/10
-
-                  bg-white
-                  dark:bg-white/5
-
-                  py-3
-                  pl-11
-                  pr-4
-
-                  text-sm
-
-                  outline-none
-
-                  transition-all
-                  duration-300
-
-                  focus:border-cyan-500
-                  focus:ring-4
-                  focus:ring-cyan-500/10
-                "
-              />
-            </div>
-
-            <button
-              className="
-                flex
-                items-center
-                justify-center
-                gap-2
-
-                rounded-2xl
-                border
-
-                border-gray-300
-                dark:border-white/10
-
-                bg-white
-                dark:bg-white/5
-
-                px-5
-                py-3
-
-                text-sm
-                font-medium
-
-                transition-all
-                duration-300
-
-                hover:border-cyan-500
-                hover:text-cyan-500
-              "
-            >
-              <Filter size={18} />
-              Filter
-            </button>
-          </div>
         </div>
 
-        {/* GRID */}
-        <div
-          className="
-            mt-10
-            grid
-            gap-7
 
-            sm:grid-cols-2
-            xl:grid-cols-3
-          "
-        >
+
+        <div className="mt-6 space-y-4">
+
+          <LapanganMapsSearch
+
+            lapangans={lapangans}
+
+            locationFilter={locationFilter}
+
+            jenisFilter={jenisFilter}
+
+            searchQuery={searchQuery}
+
+            keywordFilter={keywordFilter}
+
+            onApply={handleSearchApply}
+
+          />
+
+
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+            <div className="flex-1" />
+
+
+
+            <div className="flex items-center gap-2">
+
+              <div className="flex rounded-xl border border-gray-200 bg-white p-1 dark:border-white/10 dark:bg-white/5">
+
+                <button
+
+                  type="button"
+
+                  onClick={() => setViewMode("grid")}
+
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+
+                    viewMode === "grid"
+
+                      ? "bg-cyan-600 text-white"
+
+                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+
+                  }`}
+
+                >
+
+                  <LayoutGrid size={16} />
+
+                  Grid
+
+                </button>
+
+                <button
+
+                  type="button"
+
+                  onClick={() => setViewMode("map")}
+
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+
+                    viewMode === "map"
+
+                      ? "bg-cyan-600 text-white"
+
+                      : "text-gray-600 hover:text-gray-900 dark:text-gray-400"
+
+                  }`}
+
+                >
+
+                  <Map size={16} />
+
+                  Peta
+
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+
+          {jenisOptions.length > 0 && (
+
+            <div className="flex flex-wrap gap-2">
+
+              <button
+
+                type="button"
+
+                onClick={() => setJenisFilter("all")}
+
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+
+                  jenisFilter === "all"
+
+                    ? "bg-cyan-600 text-white"
+
+                    : "bg-white text-gray-600 hover:bg-gray-100 dark:bg-white/5 dark:text-gray-300"
+
+                }`}
+
+              >
+
+                Semua
+
+              </button>
+
+              {jenisOptions.map((jenis) => (
+
+                <button
+
+                  key={jenis}
+
+                  type="button"
+
+                  onClick={() => setJenisFilter(jenis)}
+
+                  className={`rounded-full px-4 py-2 text-sm font-medium capitalize transition ${
+
+                    jenisFilter === jenis
+
+                      ? "bg-cyan-600 text-white"
+
+                      : "bg-white text-gray-600 hover:bg-gray-100 dark:bg-white/5 dark:text-gray-300"
+
+                  }`}
+
+                >
+
+                  {jenis}
+
+                </button>
+
+              ))}
+
+            </div>
+
+          )}
+
+        </div>
+
+
+
+        <p className="mt-6 text-sm text-gray-500">
+
+          {loading
+
+            ? "Memuat..."
+
+            : `${filtered.length} lapangan${
+
+                locationFilter.center
+
+                  ? ` · radius ${locationFilter.radiusKm} km dari ${locationFilter.center.label || "lokasi Anda"}`
+
+                  : ""
+
+              }`}
+
+        </p>
+
+
+
+        <div className="mt-6">
+
           {loading && (
-            <p className="col-span-full text-center text-gray-500">Memuat lapangan...</p>
+
+            <p className="text-center text-gray-500">Memuat lapangan...</p>
+
           )}
+
           {!loading && filtered.length === 0 && (
-            <p className="col-span-full text-center text-gray-500">Belum ada lapangan tersedia.</p>
+
+            <p className="rounded-2xl border border-dashed border-gray-300 py-16 text-center text-gray-500 dark:border-white/10">
+
+              {locationFilter.center
+
+                ? "Belum ada venue dalam radius ini. Perbesar radius atau ubah kata kunci."
+
+                : "Tidak ada venue yang cocok dengan pencarian."}
+
+            </p>
+
           )}
-          {filtered.map((item) => (
-            <div
-              key={item.id}
-              className="
-                overflow-hidden
-                rounded-3xl
-                border
 
-                border-gray-200
-                dark:border-white/10
+          {!loading && filtered.length > 0 && viewMode === "grid" && (
 
-                bg-white/80
-                dark:bg-white/5
+            <div className="grid gap-7 sm:grid-cols-2 xl:grid-cols-3">
 
-                shadow-lg
-                backdrop-blur-xl
+              {filtered.map((item) => (
 
-                transition-all
-                duration-300
+                <UserLapanganCard
 
-                hover:-translate-y-2
-                hover:border-cyan-500/40
-                hover:shadow-cyan-500/10
-              "
-            >
-              {/* IMAGE */}
-              <div className="relative h-64 overflow-hidden">
-                <img
-                  src={item.gambar || "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1200&auto=format&fit=crop"}
-                  alt={item.nama}
-                  className="
-                    h-full
-                    w-full
-                    object-cover
+                  key={item.id}
 
-                    transition-transform
-                    duration-500
+                  lapangan={item}
 
-                    hover:scale-110
-                  "
+                  distanceKm={item.distanceKm}
+
                 />
 
-                <div
-                  className="
-                    absolute
-                    left-4
-                    top-4
+              ))}
 
-                    flex
-                    items-center
-                    gap-1
-
-                    rounded-full
-
-                    bg-white/90
-                    dark:bg-black/60
-
-                    px-3
-                    py-1
-
-                    text-xs
-                    font-semibold
-                  "
-                >
-                  <Star
-                    size={14}
-                    className="fill-yellow-400 text-yellow-400"
-                  />
-                  Premium
-                </div>
-              </div>
-
-              {/* BODY */}
-              <div className="p-6">
-                <div
-                  className="
-                    flex
-                    items-start
-                    justify-between
-                    gap-4
-                  "
-                >
-                  <div>
-                    <h3
-                      className="
-                        text-xl
-                        font-semibold
-                        tracking-tight
-                      "
-                    >
-                      {item.nama}
-                    </h3>
-
-                    <p
-                      className="
-                        mt-1
-                        text-sm
-
-                        text-gray-500
-                        dark:text-gray-400
-                      "
-                    >
-                      {item.jenis?.nama || "Olahraga"}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`
-                      rounded-full
-                      px-3
-                      py-1
-                      text-xs
-                      font-semibold
-
-                      ${
-                        item.status
-                          ? "bg-green-100 text-green-600 dark:bg-green-500/10 dark:text-green-400"
-                          : "bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400"
-                      }
-                    `}
-                  >
-                    {item.status ? "Tersedia" : "Tidak Tersedia"}
-                  </span>
-                </div>
-
-                <div
-                  className="
-                    mt-6
-                    flex
-                    items-center
-                    justify-between
-                  "
-                >
-                  <div>
-                    <p
-                      className="
-                        text-xs
-                        uppercase
-                        tracking-wide
-
-                        text-gray-400
-                      "
-                    >
-                      Harga
-                    </p>
-
-                    <h4
-                      className="
-                        mt-1
-                        text-lg
-                        font-bold
-
-                        text-cyan-600
-                        dark:text-cyan-400
-                      "
-                    >
-                      {formatRupiah(item.harga)} / jam
-                    </h4>
-                  </div>
-
-                  <button
-                    onClick={() => handleBooking(item.id)}
-                    disabled={!item.status || bookingId === item.id}
-                    className={`
-                      rounded-2xl
-                      px-5
-                      py-3
-
-                      text-sm
-                      font-semibold
-
-                      transition-all
-                      duration-300
-
-                      ${
-                        item.status
-                          ? `
-                            bg-cyan-500
-                            text-white
-
-                            hover:bg-cyan-400
-                            hover:shadow-lg
-                            hover:shadow-cyan-500/20
-                          `
-                          : `
-                            cursor-not-allowed
-                            bg-gray-300
-                            text-gray-500
-
-                            dark:bg-white/10
-                            dark:text-gray-500
-                          `
-                      }
-                    `}
-                  >
-                    {bookingId === item.id ? "Memproses..." : "Booking"}
-                  </button>
-                </div>
-              </div>
             </div>
-          ))}
+
+          )}
+
+          {!loading && filtered.length > 0 && viewMode === "map" && (
+
+            <LapanganMapBrowse
+
+              lapangans={filtered}
+
+              selectedId={mapSelectedId}
+
+              onSelect={setMapSelectedId}
+
+            />
+
+          )}
+
         </div>
+
       </section>
+
     </main>
+
   );
+
 }
+
+

@@ -6,6 +6,27 @@ export const getUsers = async (): Promise<UserResponse> => {
   return response.data;
 };
 
+export const lookupCustomerByPhone = async (
+  phone: string
+): Promise<{
+  data: { id: string; name: string; phone: string; email: string } | null;
+  message?: string;
+}> => {
+  const response = await api.get("/users/customers/by-phone", {
+    params: { phone },
+  });
+  return response.data;
+};
+
+export const searchCustomers = async (
+  q: string
+): Promise<{ data: Pick<User, "id" | "name" | "email" | "phone" | "city">[] }> => {
+  const response = await api.get("/users/customers/search", {
+    params: { q },
+  });
+  return response.data;
+};
+
 export const getUserById = async (id: string): Promise<{ data: User }> => {
   const response = await api.get(`/users/${id}`);
   return response.data;

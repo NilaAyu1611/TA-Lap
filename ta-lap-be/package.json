@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
+    "build": "prisma generate",
+    "deploy": "prisma migrate deploy",
     "seed": "prisma db seed",
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "prisma": {
@@ -22,10 +26,16 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "google-auth-library": "^10.9.0",
     "jsonwebtoken": "^9.0.3",
-    "prisma": "^6.19.3"
+    "nodemailer": "^9.0.1",
+    "prisma": "^6.19.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@mermaid-js/mermaid-cli": "^11.15.0",
+    "nodemon": "^3.1.14",
+    "prisma-erd-generator": "^2.4.3",
+    "puppeteer": "^24.43.1"
   }
 }

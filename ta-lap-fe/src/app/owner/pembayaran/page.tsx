@@ -1,723 +1,207 @@
 "use client";
 
-import Link from "next/link";
+import { Loader2, RefreshCw, Wallet } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  Bell,
-  CalendarDays,
-  CheckCircle2,
-  CreditCard,
-  DollarSign,
-  Download,
-  LogOut,
-  Menu,
-  Search,
-  Wallet,
-  X,
-  Clock3,
-  BadgeDollarSign,
-} from "lucide-react";
-
-import { useState } from "react";
-
-import ThemeToggle from "@/components/ThemeToggle";
+import PembayaranDetailModal from "@/components/admin/pembayaran/PembayaranDetailModal";
+import PembayaranFilters from "@/components/admin/pembayaran/PembayaranFilters";
+import PembayaranStatsSection from "@/components/admin/pembayaran/PembayaranStats";
+import PembayaranTable from "@/components/admin/pembayaran/PembayaranTable";
+import OwnerSetoranTunaiSection from "@/components/owner/setoran/OwnerSetoranTunaiSection";
+import PendingPesananAlert from "@/components/admin/pembayaran/PendingPesananAlert";
 import OwnerNavbar from "@/components/OwnerNavbar";
-
-const pembayaranData = [
-  {
-    id: 1,
-    customer: "Ahmad Fauzi",
-    lapangan: "Futsal Arena A",
-    metode: "QRIS",
-    tanggal: "19 Mei 2026",
-    total: "Rp 250.000",
-    status: "success",
-  },
-  {
-    id: 2,
-    customer: "Rizky Ramadhan",
-    lapangan: "Badminton Court B",
-    metode: "Transfer Bank",
-    tanggal: "20 Mei 2026",
-    total: "Rp 180.000",
-    status: "pending",
-  },
-  {
-    id: 3,
-    customer: "Dimas Saputra",
-    lapangan: "Mini Soccer Elite",
-    metode: "Tunai",
-    tanggal: "20 Mei 2026",
-    total: "Rp 500.000",
-    status: "success",
-  },
-];
+import { getApiErrorMessage } from "@/hooks/usePesananFormOptions";
+import { usePesanan } from "@/hooks/usePesanan";
+import { useTransaksi } from "@/hooks/useTransaksi";
+import {
+  Transaksi,
+  TransaksiKomisiFilter,
+  TransaksiStatus,
+  TransaksiStatusFilter,
+} from "@/types/transaksi";
 
 export default function OwnerPembayaranPage() {
-  const [mobileMenu, setMobileMenu] = useState(false);
+  const { transaksi, stats, loading, reload, updateTransaksi } = useTransaksi();
+  const { pesanan, loading: pesananLoading, reload: reloadPesanan } = usePesanan();
+
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<TransaksiStatusFilter>("all");
+  const [komisi, setKomisi] = useState<TransaksiKomisiFilter>("all");
+  const [selected, setSelected] = useState<Transaksi | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const pendingTanpaPembayaran = useMemo(
+    () =>
+      pesanan.filter(
+        (item) => item.status === "pending" && !item.pembayaran?.metode
+      ),
+    [pesanan]
+  );
+
+  const filtered = useMemo(() => {
+    return transaksi.filter((item) => {
+      const q = search.toLowerCase();
+      const matchSearch =
+        item.kode_transaksi.toLowerCase().includes(q) ||
+        (item.kode_booking || "").toLowerCase().includes(q) ||
+        (item.user_name || "").toLowerCase().includes(q) ||
+        (item.lapangan_nama || "").toLowerCase().includes(q);
+
+      const matchStatus =
+        status === "all" ||
+        item.status === status ||
+        (status === "gagal" && (item.status === "gagal" || item.status === "refund"));
+
+      const matchKomisi =
+        komisi === "all" || item.status_komisi === komisi;
+
+      return matchSearch && matchStatus && matchKomisi;
+    });
+  }, [transaksi, search, status, komisi]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const updated = transaksi.find((item) => item.id === selected.id);
+    if (updated) setSelected(updated);
+  }, [transaksi, selected?.id]);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const openDetail = (item: Transaksi) => {
+    setSelected(item);
+    setDetailOpen(true);
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([reload(), reloadPesanan()]);
+  };
+
+  const handleVerify = async (id: string, newStatus: TransaksiStatus) => {
+    try {
+      await updateTransaksi(id, { status: newStatus });
+      await reloadPesanan();
+      showToast(
+        "success",
+        newStatus === "sukses"
+          ? "Pembayaran diverifikasi — pesanan diperbarui"
+          : "Pembayaran ditandai gagal"
+      );
+    } catch (err: unknown) {
+      showToast("error", getApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  const isLoading = loading || pesananLoading;
 
   return (
-    <main
-      className="
-        min-h-screen
-        bg-gray-50
-        text-gray-900
+    <main className="relative min-h-screen bg-gray-50 text-gray-900 transition-all duration-300 dark:bg-[#020617] dark:text-white">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl" />
+      </div>
 
-        dark:bg-[#020817]
-        dark:text-white
-
-        transition-all
-        duration-300
-      "
-    >
-      {/* BACKGROUND */}
-      <div
-        className="
-          fixed
-          inset-0
-          -z-10
-
-          bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.15),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.12),transparent_25%)]
-        "
-      />
-
-      {/* NAVBAR */}
       <OwnerNavbar active="pembayaran" />
 
-      {/* CONTENT */}
-      <section
-        className="
-          mx-auto
-          max-w-7xl
-
-          px-6
-          py-10
-        "
-      >
-        {/* HERO */}
-        <div
-          className="
-            relative
-            overflow-hidden
-
-            rounded-[32px]
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-8
-            md:p-10
-
-            shadow-sm
-          "
-        >
-          {/* GLOW */}
+      <section className="relative z-10 mx-auto max-w-7xl px-4 py-8 md:px-6">
+        {toast && (
           <div
-            className="
-              absolute
-              right-[-100px]
-              top-[-100px]
-
-              h-72
-              w-72
-
-              rounded-full
-
-              bg-cyan-500/10
-
-              blur-3xl
-            "
-          />
-
-          <div className="relative z-10">
-            <div
-              className="
-                inline-flex
-                items-center
-                gap-2
-
-                rounded-full
-
-                bg-cyan-500/10
-
-                px-4
-                py-2
-
-                text-sm
-                font-semibold
-                text-cyan-500
-              "
-            >
-              <Wallet size={16} />
-              OWNER PEMBAYARAN
-            </div>
-
-            <h2
-              className="
-                mt-6
-
-                text-4xl
-                font-black
-                tracking-tight
-
-                md:text-5xl
-              "
-            >
-              Monitoring Pembayaran Booking
-            </h2>
-
-            <p
-              className="
-                mt-5
-                max-w-3xl
-
-                text-base
-                leading-8
-
-                text-gray-600
-                dark:text-gray-300
-              "
-            >
-              Kelola transaksi pembayaran pelanggan,
-              validasi pembayaran, dan pantau pemasukan
-              venue secara realtime.
-            </p>
-          </div>
-        </div>
-
-        {/* STATS */}
-        <div
-          className="
-            mt-10
-
-            grid
-            gap-6
-
-            md:grid-cols-2
-            xl:grid-cols-4
-          "
-        >
-          {/* CARD */}
-          <div
-            className="
-              rounded-3xl
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
+            className={`fixed right-6 top-24 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${
+              toast.type === "success"
+                ? "bg-emerald-600 text-white"
+                : "bg-red-600 text-white"
+            }`}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                    dark:text-gray-400
-                  "
-                >
-                  Total Pendapatan
-                </p>
+            {toast.message}
+          </div>
+        )}
 
-                <h3
-                  className="
-                    mt-3
-                    text-3xl
-                    font-black
-                  "
-                >
-                  Rp 12.5jt
-                </h3>
-              </div>
-
-              <div
-                className="
-                  flex
-                  h-14
-                  w-14
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  bg-green-500/10
-                "
-              >
-                <DollarSign className="text-green-500" />
-              </div>
+        {isLoading ? (
+          <div className="flex min-h-[400px] items-center justify-center">
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <Loader2 className="animate-spin" size={20} />
+              <span>Memuat data pembayaran...</span>
             </div>
           </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-cyan-50 via-white to-white p-6 shadow-sm dark:border-white/10 dark:from-cyan-950/20 dark:via-gray-900/50 dark:to-gray-900/50">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+                    <Wallet size={14} />
+                    Keuangan Venue
+                  </p>
+                  <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+                    Monitoring Pembayaran
+                  </h1>
+                  <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+                    Setiap booking sukses = 1 transaksi. Pembayaran tunai
+                    diterima langsung di venue — pisahkan 5% komisi platform
+                    per transaksi untuk disetor bulanan.
+                  </p>
+                </div>
 
-          {/* CARD */}
-          <div
-            className="
-              rounded-3xl
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                    dark:text-gray-400
-                  "
+                <button
+                  onClick={handleRefresh}
+                  className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:border-cyan-200 dark:border-white/10 dark:bg-white/5"
                 >
-                  Pembayaran Pending
-                </p>
-
-                <h3
-                  className="
-                    mt-3
-                    text-3xl
-                    font-black
-                  "
-                >
-                  8
-                </h3>
-              </div>
-
-              <div
-                className="
-                  flex
-                  h-14
-                  w-14
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  bg-yellow-500/10
-                "
-              >
-                <Clock3 className="text-yellow-500" />
+                  <RefreshCw size={16} />
+                  Refresh
+                </button>
               </div>
             </div>
-          </div>
 
-          {/* CARD */}
-          <div
-            className="
-              rounded-3xl
-              border
-              border-gray-200
-              dark:border-white/10
+            <PendingPesananAlert pesanan={pendingTanpaPembayaran} />
 
-              bg-white
-              dark:bg-white/5
+            <PembayaranStatsSection stats={stats} />
 
-              p-6
-            "
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                    dark:text-gray-400
-                  "
-                >
-                  Pembayaran Berhasil
-                </p>
+            <OwnerSetoranTunaiSection variant="compact" />
 
-                <h3
-                  className="
-                    mt-3
-                    text-3xl
-                    font-black
-                  "
-                >
-                  142
-                </h3>
-              </div>
-
-              <div
-                className="
-                  flex
-                  h-14
-                  w-14
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  bg-cyan-500/10
-                "
-              >
-                <CheckCircle2 className="text-cyan-500" />
-              </div>
+            <div className="rounded-xl border border-gray-200/80 bg-white p-4 text-sm text-gray-600 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-400">
+              <strong className="text-gray-900 dark:text-white">Alur terintegrasi:</strong>{" "}
+              Customer booking (1 booking = 1 komisi) → Owner catat/konfirmasi di{" "}
+              <span className="font-medium text-cyan-700 dark:text-cyan-400">Pesanan</span>{" "}
+              → Transaksi muncul di sini dengan rincian komisi → Admin cairkan
+              pendapatan ke rekening owner.
             </div>
-          </div>
 
-          {/* CARD */}
-          <div
-            className="
-              rounded-3xl
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                    dark:text-gray-400
-                  "
-                >
-                  Transaksi Hari Ini
-                </p>
-
-                <h3
-                  className="
-                    mt-3
-                    text-3xl
-                    font-black
-                  "
-                >
-                  23
-                </h3>
-              </div>
-
-              <div
-                className="
-                  flex
-                  h-14
-                  w-14
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  bg-purple-500/10
-                "
-              >
-                <BadgeDollarSign className="text-purple-500" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* FILTER */}
-        <div
-          className="
-            mt-10
-
-            flex
-            flex-col
-            gap-4
-
-            lg:flex-row
-            lg:items-center
-            lg:justify-between
-          "
-        >
-          {/* SEARCH */}
-          <div
-            className="
-              flex
-              items-center
-              gap-3
-
-              rounded-2xl
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              px-4
-              py-3
-
-              lg:w-[350px]
-            "
-          >
-            <Search
-              size={18}
-              className="text-gray-400"
+            <PembayaranFilters
+              search={search}
+              setSearch={setSearch}
+              status={status}
+              setStatus={setStatus}
+              komisi={komisi}
+              setKomisi={setKomisi}
+              totalCount={filtered.length}
             />
 
-            <input
-              type="text"
-              placeholder="Cari pembayaran..."
-              className="
-                w-full
-                bg-transparent
-                outline-none
-
-                placeholder:text-gray-400
-              "
+            <PembayaranTable
+              pembayaran={filtered}
+              emptyMessage={
+                search || status !== "all" || komisi !== "all"
+                  ? "Tidak ada pembayaran yang cocok dengan filter"
+                  : "Belum ada transaksi pembayaran — catat pembayaran dari halaman Pesanan"
+              }
+              onDetail={openDetail}
             />
           </div>
-
-          {/* EXPORT */}
-          <button
-            className="
-              flex
-              items-center
-              gap-2
-
-              rounded-2xl
-
-              bg-cyan-500
-
-              px-5
-              py-3
-
-              text-sm
-              font-semibold
-              text-white
-
-              transition
-              hover:bg-cyan-400
-            "
-          >
-            <Download size={18} />
-            Export Laporan
-          </button>
-        </div>
-
-        {/* TABLE */}
-        <div
-          className="
-            mt-8
-            overflow-hidden
-
-            rounded-[32px]
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-          "
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead
-                className="
-                  border-b
-                  border-gray-200
-                  dark:border-white/10
-                "
-              >
-                <tr>
-                  {[
-                    "Pelanggan",
-                    "Lapangan",
-                    "Metode",
-                    "Tanggal",
-                    "Total",
-                    "Status",
-                    "Aksi",
-                  ].map((item) => (
-                    <th
-                      key={item}
-                      className="
-                        px-6
-                        py-5
-                        text-left
-
-                        text-sm
-                        font-semibold
-                      "
-                    >
-                      {item}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {pembayaranData.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="
-                      border-b
-                      border-gray-200
-                      dark:border-white/5
-
-                      transition
-                      hover:bg-gray-100/70
-                      dark:hover:bg-white/[0.03]
-                    "
-                  >
-                    <td className="px-6 py-5">
-                      <div>
-                        <h3 className="font-semibold">
-                          {item.customer}
-                        </h3>
-
-                        <p
-                          className="
-                            mt-1
-                            text-sm
-                            text-gray-500
-                            dark:text-gray-400
-                          "
-                        >
-                          Customer Booking
-                        </p>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-5">
-                      {item.lapangan}
-                    </td>
-
-                    <td className="px-6 py-5">
-                      <div
-                        className="
-                          inline-flex
-                          items-center
-                          gap-2
-
-                          rounded-xl
-
-                          bg-gray-100
-                          dark:bg-white/5
-
-                          px-4
-                          py-2
-
-                          text-sm
-                        "
-                      >
-                        <CreditCard size={16} />
-                        {item.metode}
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-5">
-                      <div
-                        className="
-                          flex
-                          items-center
-                          gap-2
-                        "
-                      >
-                        <CalendarDays size={16} />
-                        {item.tanggal}
-                      </div>
-                    </td>
-
-                    <td
-                      className="
-                        px-6
-                        py-5
-
-                        font-bold
-                      "
-                    >
-                      {item.total}
-                    </td>
-
-                    <td className="px-6 py-5">
-                      {item.status === "success" ? (
-                        <div
-                          className="
-                            inline-flex
-                            items-center
-                            gap-2
-
-                            rounded-full
-
-                            bg-green-500/10
-
-                            px-4
-                            py-2
-
-                            text-sm
-                            font-semibold
-                            text-green-500
-                          "
-                        >
-                          <CheckCircle2 size={16} />
-                          Success
-                        </div>
-                      ) : (
-                        <div
-                          className="
-                            inline-flex
-                            items-center
-                            gap-2
-
-                            rounded-full
-
-                            bg-yellow-500/10
-
-                            px-4
-                            py-2
-
-                            text-sm
-                            font-semibold
-                            text-yellow-500
-                          "
-                        >
-                          <Clock3 size={16} />
-                          Pending
-                        </div>
-                      )}
-                    </td>
-
-                    <td className="px-6 py-5">
-                      <button
-                        className="
-                          rounded-2xl
-
-                          border
-                          border-gray-300
-                          dark:border-white/10
-
-                          px-4
-                          py-2
-
-                          text-sm
-                          font-medium
-
-                          transition
-
-                          hover:border-cyan-500
-                          hover:text-cyan-500
-                        "
-                      >
-                        Detail
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        )}
       </section>
+
+      <PembayaranDetailModal
+        open={detailOpen}
+        pembayaran={selected}
+        onClose={() => setDetailOpen(false)}
+        onVerify={handleVerify}
+      />
     </main>
   );
 }

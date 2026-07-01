@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Clock3,
@@ -9,39 +10,90 @@ import {
   CheckCircle2,
   AlertCircle,
   BadgeCheck,
+  XCircle,
+  CreditCard,
 } from "lucide-react";
 import UserNavbar from "@/components/UserNavbar";
-import { getMyPesanan } from "@/services/pesanan.service";
+import CancelPesananDialog from "@/components/user/CancelPesananDialog";
+import PaymentDeadlineBanner from "@/components/user/PaymentDeadlineBanner";
+import PesananPaymentAction from "@/components/user/pesanan/PesananPaymentAction";
+import UserPesananFilters from "@/components/user/pesanan/UserPesananFilters";
+import { cancelPesanan, getMyPesanan } from "@/services/pesanan.service";
 import { formatDate, formatRupiah, formatTime } from "@/lib/auth";
-
-type PesananItem = {
-  id: string;
-  kode_booking?: string;
-  status: string;
-  total_harga: number | string;
-  tanggal_booking: string;
-  jam_mulai: string;
-  jam_selesai: string;
-  lapangan?: { nama: string; jenis?: { nama: string } };
-};
+import { countNeedsPayment, getPaymentPageHref, isAwaitingPaymentConfirmation, isPaymentSuccess, needsPayment } from "@/lib/pesananPayment";
+import {
+  filterVisibleUserPesanans,
+  getCancelledHideSecondsLeft,
+} from "@/lib/pesananVisibility";
+import {
+  filterUserPesanans,
+  UserPesananStatusFilter,
+} from "@/lib/userPesananFilter";
+import { Pesanan } from "@/types/pesanan";
 
 export default function PesananPage() {
-  const [pesanans, setPesanans] = useState<PesananItem[]>([]);
+  const [pesanans, setPesanans] = useState<Pesanan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelTarget, setCancelTarget] = useState<Pesanan | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<UserPesananStatusFilter>("all");
+
+  const loadData = async () => {
+    try {
+      const result = await getMyPesanan();
+      setPesanans(result.data || []);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const result = await getMyPesanan();
-        setPesanans(result.data || []);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    loadData();
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const visiblePesanans = useMemo(
+    () => filterVisibleUserPesanans(pesanans, now),
+    [pesanans, now]
+  );
+
+  const filteredPesanans = useMemo(
+    () =>
+      filterUserPesanans(visiblePesanans, {
+        search,
+        status: statusFilter,
+      }),
+    [visiblePesanans, search, statusFilter]
+  );
+
+  const hasActiveFilter = search.trim() !== "" || statusFilter !== "all";
+
+  const handleCancel = async (alasan?: string) => {
+    if (!cancelTarget) return;
+    const result = await cancelPesanan(cancelTarget.id, alasan);
+    setToast(result.message);
+    setTimeout(() => setToast(null), 4000);
+    setPesanans((prev) =>
+      prev.map((p) => (p.id === cancelTarget.id ? result.data : p))
+    );
+  };
+
+  const canCancel = (status: string) =>
+    status === "pending" || status === "dibayar";
+
+  const unpaidCount = useMemo(
+    () => countNeedsPayment(visiblePesanans),
+    [visiblePesanans]
+  );
 
   return (
     <main
@@ -103,6 +155,12 @@ export default function PesananPage() {
       {/* NAVBAR */}
       <UserNavbar active="pesanan" />
 
+      {toast && (
+        <div className="fixed right-6 top-24 z-50 max-w-sm rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      )}
+
       {/* CONTENT */}
       <section className="relative z-10 mx-auto max-w-7xl px-6 py-10">
         {/* HEADER */}
@@ -134,18 +192,80 @@ export default function PesananPage() {
           </p>
         </div>
 
+        {unpaidCount > 0 && (
+          <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50/90 p-5 dark:border-amber-500/30 dark:bg-amber-500/10 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-amber-900 dark:text-amber-100">
+                {unpaidCount} booking belum dibayar
+              </p>
+              <p className="mt-1 text-sm text-amber-800/80 dark:text-amber-300/90">
+                Bayar sebelum H-15 menit jam main. Jika belum dibayar, booking
+                otomatis dibatalkan dan slot kembali tersedia.
+              </p>
+            </div>
+            <Link
+              href="/user/pembayaran"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-500"
+            >
+              <CreditCard size={16} />
+              Ke Halaman Pembayaran
+            </Link>
+          </div>
+        )}
+
+        {!loading && visiblePesanans.length > 0 && (
+          <UserPesananFilters
+            search={search}
+            status={statusFilter}
+            resultCount={filteredPesanans.length}
+            totalCount={visiblePesanans.length}
+            onSearchChange={setSearch}
+            onStatusChange={setStatusFilter}
+            onReset={() => {
+              setSearch("");
+              setStatusFilter("all");
+            }}
+          />
+        )}
+
         {/* CARD LIST */}
         <div className="mt-10 space-y-6">
           {loading && (
             <p className="text-center text-gray-500">Memuat pesanan...</p>
           )}
-          {!loading && pesanans.length === 0 && (
-            <p className="text-center text-gray-500">Belum ada pesanan.</p>
-          )}
-          {pesanans.map((item) => (
+          {!loading &&
+            visiblePesanans.length > 0 &&
+            filteredPesanans.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-gray-200 bg-white/70 py-16 text-center backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
+                <h3 className="text-lg font-semibold">Pesanan tidak ditemukan</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Coba kata kunci lain atau ubah filter status.
+                </p>
+                {hasActiveFilter && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setStatusFilter("all");
+                    }}
+                    className="mt-4 text-sm font-medium text-cyan-600 hover:text-cyan-500 dark:text-cyan-400"
+                  >
+                    Reset pencarian & filter
+                  </button>
+                )}
+              </div>
+            )}
+          {filteredPesanans.map((item) => {
+            const hideSecondsLeft = getCancelledHideSecondsLeft(item, now);
+            const isFadingOut =
+              item.status === "dibatalkan" &&
+              hideSecondsLeft !== null &&
+              hideSecondsLeft <= 3;
+
+            return (
             <div
               key={item.id}
-              className="
+              className={`
                 rounded-3xl
                 border
 
@@ -161,11 +281,10 @@ export default function PesananPage() {
                 backdrop-blur-xl
 
                 transition-all
-                duration-300
+                duration-500
 
-                hover:-translate-y-1
-                hover:border-cyan-500/30
-              "
+                ${isFadingOut ? "scale-[0.98] opacity-40" : "hover:-translate-y-1 hover:border-cyan-500/30"}
+              `}
             >
               <div
                 className="
@@ -195,7 +314,7 @@ export default function PesananPage() {
                         tracking-tight
                       "
                     >
-                      {item.lapangan?.nama || "Lapangan"}
+                      {item.lapangan_nama || "Lapangan"}
                     </h2>
 
                     <span
@@ -215,9 +334,13 @@ export default function PesananPage() {
                         dark:text-cyan-400
                       "
                     >
-                      {item.lapangan?.jenis?.nama || "-"}
+                      {item.lapangan_jenis || "-"}
                     </span>
                   </div>
+
+                  <p className="mt-2 font-mono text-xs text-gray-500 dark:text-gray-400">
+                    {item.kode_booking}
+                  </p>
 
                   {/* INFO */}
                   <div
@@ -391,11 +514,13 @@ export default function PesananPage() {
                       </div>
                     </div>
                   </div>
+
+                  <PaymentDeadlineBanner pesanan={item} now={now} />
                 </div>
 
-                {/* STATUS */}
-                <div>
-                  {item.status === "pending" && (
+                {/* STATUS & AKSI */}
+                <div className="flex flex-col items-end gap-3">
+                  {needsPayment(item) ? (
                     <div
                       className="
                         flex
@@ -420,9 +545,7 @@ export default function PesananPage() {
                       <AlertCircle size={18} />
                       Belum Dibayar
                     </div>
-                  )}
-
-                  {item.status === "dibayar" && (
+                  ) : isPaymentSuccess(item) || item.status === "dibayar" ? (
                     <div
                       className="
                         flex
@@ -447,6 +570,41 @@ export default function PesananPage() {
                       <CheckCircle2 size={18} />
                       Dibayar
                     </div>
+                  ) : isAwaitingPaymentConfirmation(item) ? (
+                    <div
+                      className="
+                        flex
+                        items-center
+                        gap-2
+
+                        rounded-2xl
+
+                        bg-cyan-100
+                        dark:bg-cyan-500/10
+
+                        px-5
+                        py-3
+
+                        text-sm
+                        font-semibold
+
+                        text-cyan-700
+                        dark:text-cyan-400
+                      "
+                    >
+                      <Clock3 size={18} />
+                      Menunggu Konfirmasi
+                    </div>
+                  ) : null}
+
+                  {item.status === "pending" && needsPayment(item) && (
+                    <Link
+                      href={getPaymentPageHref(item.id)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-cyan-500"
+                    >
+                      <CreditCard size={16} />
+                      Bayar Sekarang
+                    </Link>
                   )}
 
                   {item.status === "selesai" && (
@@ -475,58 +633,141 @@ export default function PesananPage() {
                       Selesai
                     </div>
                   )}
+
+                  {item.status === "dibatalkan" && (
+                    <div
+                      className="
+                        flex
+                        items-center
+                        gap-2
+
+                        rounded-2xl
+
+                        bg-red-100
+                        dark:bg-red-500/10
+
+                        px-5
+                        py-3
+
+                        text-sm
+                        font-semibold
+
+                        text-red-700
+                        dark:text-red-400
+                      "
+                    >
+                      <XCircle size={18} />
+                      Dibatalkan
+                    </div>
+                  )}
+
+                  {item.status === "expired" && (
+                    <div
+                      className="
+                        flex
+                        items-center
+                        gap-2
+
+                        rounded-2xl
+
+                        bg-gray-100
+                        dark:bg-gray-500/10
+
+                        px-5
+                        py-3
+
+                        text-sm
+                        font-semibold
+
+                        text-gray-700
+                        dark:text-gray-400
+                      "
+                    >
+                      <XCircle size={18} />
+                      Expired (belum bayar)
+                    </div>
+                  )}
+
+                  {item.status === "dibatalkan" &&
+                    item.pembayaran?.status === "refund" &&
+                    (item.pembayaran.jumlah_refund ?? 0) > 0 && (
+                      <p className="max-w-[220px] text-right text-xs text-gray-500">
+                        Refund:{" "}
+                        <strong className="text-emerald-600">
+                          {formatRupiah(item.pembayaran.jumlah_refund ?? 0)}
+                        </strong>
+                        {item.pembayaran.jumlah_potongan ? (
+                          <>
+                            {" "}
+                            · Potongan:{" "}
+                            {formatRupiah(item.pembayaran.jumlah_potongan)}
+                          </>
+                        ) : null}
+                      </p>
+                    )}
+
+                  {canCancel(item.status) && (
+                    <button
+                      onClick={() => setCancelTarget(item)}
+                      className="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-500/30 dark:hover:bg-red-500/10"
+                    >
+                      Batalkan Pesanan
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {item.status === "dibatalkan" && hideSecondsLeft !== null && hideSecondsLeft > 0 && (
+                <div className="mt-4 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-100/90 px-4 py-2.5 text-xs text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
+                  <Clock3 size={14} className="shrink-0 text-gray-400" />
+                  Menghilang dari daftar dalam{" "}
+                  <strong className="tabular-nums text-gray-800 dark:text-gray-200">
+                    {hideSecondsLeft} detik
+                  </strong>
+                </div>
+              )}
+
+              <PesananPaymentAction pesanan={item} />
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* EMPTY */}
-        {pesanans.length === 0 && (
+        {!loading && visiblePesanans.length === 0 && (
           <div
             className="
               mt-10
               rounded-3xl
               border
-
               border-dashed
               border-gray-300
               dark:border-white/10
-
               bg-white/70
               dark:bg-white/5
-
               py-20
               text-center
-
               backdrop-blur-xl
             "
           >
-            <h3
-              className="
-                text-2xl
-                font-semibold
-              "
-            >
-              Belum Ada Pesanan
-            </h3>
-
-            <p
-              className="
-                mt-3
-
-                text-sm
-
-                text-gray-500
-                dark:text-gray-400
-              "
-            >
-              Anda belum memiliki riwayat booking
-              lapangan.
+            <h3 className="text-2xl font-semibold">Belum Ada Pesanan</h3>
+            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+              Anda belum memiliki riwayat booking lapangan.
             </p>
           </div>
         )}
       </section>
+
+      <CancelPesananDialog
+        open={cancelTarget !== null}
+        totalHarga={Number(cancelTarget?.total_harga || 0)}
+        totalBayar={cancelTarget?.pembayaran?.total_bayar}
+        pesananStatus={cancelTarget?.status}
+        pembayaranStatus={cancelTarget?.pembayaran?.status}
+        kodeBooking={cancelTarget?.kode_booking}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={handleCancel}
+      />
     </main>
   );
 }

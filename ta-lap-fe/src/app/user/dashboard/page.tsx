@@ -1,332 +1,103 @@
 "use client";
 
 import Link from "next/link";
+import { Loader2, RefreshCw } from "lucide-react";
 
-import {
-  CalendarDays,
-  CreditCard,
-  LayoutDashboard,
-  LogOut,
-  MapPinned,
-  Receipt,
-  Trophy,
-} from "lucide-react";
-
-import ThemeToggle from "@/components/ThemeToggle";
 import UserNavbar from "@/components/UserNavbar";
+import UserDashboardAlerts from "@/components/user/dashboard/UserDashboardAlerts";
+import UserDashboardBookingsList from "@/components/user/dashboard/UserDashboardBookingsList";
+import UserDashboardHero from "@/components/user/dashboard/UserDashboardHero";
+import UserDashboardInsights from "@/components/user/dashboard/UserDashboardInsights";
+import UserDashboardStatsSection from "@/components/user/dashboard/UserDashboardStats";
+import { useUserDashboard } from "@/hooks/useUserDashboard";
 
 export default function UserDashboard() {
+  const { data, loading, error, reload } = useUserDashboard();
+
   return (
-    <main
-      className="
-        min-h-screen
+    <main className="relative min-h-screen bg-gray-50 text-gray-900 transition-all duration-300 dark:bg-[#0b1120] dark:text-white">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-violet-500/10 blur-3xl" />
+      </div>
 
-        bg-gray-50
-        text-gray-900
-
-        dark:bg-[#0b1120]
-        dark:text-white
-
-        transition-all
-        duration-300
-      "
-    >
-      {/* NAVBAR */}
       <UserNavbar active="dashboard" />
 
-      {/* CONTENT */}
-      <section
-        className="
-          mx-auto
-          max-w-7xl
-
-          px-6
-          py-10
-        "
-      >
-        {/* HERO */}
-        <div
-          className="
-            relative
-            overflow-hidden
-
-            rounded-3xl
-
-            border
-
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-8
-
-            shadow-sm
-            dark:shadow-none
-          "
-        >
-          {/* GLOW */}
-          <div
-            className="
-              absolute
-              right-[-100px]
-              top-[-100px]
-
-              h-64
-              w-64
-
-              rounded-full
-              bg-cyan-500/10
-
-              blur-3xl
-            "
-          />
-
-          <div className="relative z-10">
-            <p
-              className="
-                text-sm
-                font-medium
-
-                text-cyan-500
-              "
-            >
-              USER DASHBOARD
-            </p>
-
-            <h2
-              className="
-                mt-3
-
-                text-4xl
-                font-bold
-                tracking-tight
-              "
-            >
-              Selamat Datang di TA-LAP
-            </h2>
-
-            <p
-              className="
-                mt-4
-                max-w-2xl
-
-                text-base
-                leading-8
-
-                text-gray-600
-                dark:text-gray-300
-              "
-            >
-              Kelola booking lapangan, pembayaran, dan aktivitas reservasi Anda
-              secara realtime melalui dashboard modern yang cepat dan efisien.
-            </p>
-          </div>
-        </div>
-
-        {/* CARDS */}
-        <div
-          className="
-            mt-10
-
-            grid
-            gap-6
-
-            md:grid-cols-2
-            xl:grid-cols-3
-          "
-        >
-          {/* CARD */}
-          <div
-            className="
-              rounded-3xl
-              border
-
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-
-              transition-all
-              duration-300
-
-              hover:-translate-y-1
-              hover:border-cyan-500/30
-            "
-          >
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-cyan-500/10
-              "
-            >
-              <LayoutDashboard className="text-cyan-500" />
+      <section className="relative z-10 mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
+        {loading ? (
+          <div className="flex min-h-[420px] items-center justify-center">
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <Loader2 className="animate-spin" size={20} />
+              <span>Memuat dashboard Anda...</span>
             </div>
-
-            <h3
-              className="
-                mt-6
-
-                text-xl
-                font-semibold
-              "
-            >
-              Dashboard Aktivitas
-            </h3>
-
-            <p
-              className="
-                mt-3
-
-                text-sm
-                leading-7
-
-                text-gray-600
-                dark:text-gray-400
-              "
-            >
-              Lihat ringkasan aktivitas booking dan status reservasi Anda.
-            </p>
           </div>
-
-          {/* CARD */}
-          <div
-            className="
-              rounded-3xl
-              border
-
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-
-              transition-all
-              duration-300
-
-              hover:-translate-y-1
-              hover:border-cyan-500/30
-            "
-          >
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-purple-500/10
-              "
+        ) : error ? (
+          <div className="flex min-h-[420px] flex-col items-center justify-center gap-4">
+            <p className="text-sm text-red-500">{error}</p>
+            <button
+              onClick={reload}
+              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white"
             >
-              <CalendarDays className="text-purple-500" />
+              Coba Lagi
+            </button>
+          </div>
+        ) : data ? (
+          <div className="space-y-8">
+            <UserDashboardHero
+              userName={data.user.name}
+              city={data.user.city}
+              stats={data.stats}
+              nextBooking={data.upcomingBookings[0] ?? null}
+            />
+
+            <UserDashboardAlerts
+              stats={data.stats}
+              maintenanceMode={data.maintenance_mode}
+            />
+
+            <UserDashboardStatsSection stats={data.stats} />
+
+            {/* Jadwal — prioritas utama pelanggan */}
+            <UserDashboardBookingsList
+              title="Jadwal Main Mendatang"
+              subtitle="Booking aktif — pastikan sudah dibayar & datang tepat waktu"
+              bookings={data.upcomingBookings}
+              viewAllHref="/user/pesanan"
+              showCover
+              emptyMessage="Belum ada jadwal. Yuk cari lapangan dan booking slot favorit Anda!"
+            />
+
+            <UserDashboardInsights
+              bulanan={data.charts.bulanan}
+              bookingStatus={data.charts.bookingStatus}
+              perMetode={data.charts.perMetode}
+              topLapangan={data.charts.topLapangan}
+              perJenis={data.charts.perJenis}
+              totalPengeluaran={data.stats.totalPengeluaran}
+              avgPerBooking={data.stats.avgPerBooking}
+            />
+
+            {data.recentBookings.length > 0 && (
+              <UserDashboardBookingsList
+                title="Aktivitas Terbaru"
+                subtitle="Riwayat pesanan terakhir"
+                bookings={data.recentBookings.slice(0, 4)}
+                viewAllHref="/user/pesanan"
+                emptyMessage=""
+              />
+            )}
+
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={reload}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 transition hover:border-gray-300 dark:border-white/10 dark:bg-white/5 dark:text-gray-400"
+              >
+                <RefreshCw size={14} />
+                Perbarui data
+              </button>
             </div>
-
-            <h3
-              className="
-                mt-6
-
-                text-xl
-                font-semibold
-              "
-            >
-              Booking Lapangan
-            </h3>
-
-            <p
-              className="
-                mt-3
-
-                text-sm
-                leading-7
-
-                text-gray-600
-                dark:text-gray-400
-              "
-            >
-              Pesan lapangan futsal atau badminton dengan sistem realtime anti
-              bentrok.
-            </p>
           </div>
-
-          {/* CARD */}
-          <div
-            className="
-              rounded-3xl
-              border
-
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-
-              transition-all
-              duration-300
-
-              hover:-translate-y-1
-              hover:border-cyan-500/30
-            "
-          >
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-pink-500/10
-              "
-            >
-              <CreditCard className="text-pink-500" />
-            </div>
-
-            <h3
-              className="
-                mt-6
-
-                text-xl
-                font-semibold
-              "
-            >
-              Pembayaran
-            </h3>
-
-            <p
-              className="
-                mt-3
-
-                text-sm
-                leading-7
-
-                text-gray-600
-                dark:text-gray-400
-              "
-            >
-              Kelola transaksi dan pembayaran booking secara aman dan cepat.
-            </p>
-          </div>
-        </div>
+        ) : null}
       </section>
     </main>
   );

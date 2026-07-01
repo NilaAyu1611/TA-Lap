@@ -55,7 +55,9 @@
 
 
 
-import prisma from "../../config/prisma.js";
+import { buildAdminDashboard } from "../../services/dashboard/adminDashboardService.js";
+import { buildOwnerDashboard } from "../../services/dashboard/ownerDashboardService.js";
+import { buildUserDashboard } from "../../services/dashboard/userDashboardService.js";
 
 const serialize = (data) =>
   JSON.parse(
@@ -69,84 +71,30 @@ const serialize = (data) =>
 
 // ================= ADMIN =================
 
-export const getAdminDashboard =
-  async (req, res) => {
-    try {
-      const totalUsers =
-        await prisma.user.count({
-          where: {
-            role: "user",
-          },
-        });
-
-      const totalOwners =
-        await prisma.user.count({
-          where: {
-            role: "owner",
-          },
-        });
-
-      const totalBooking =
-        await prisma.pesanan.count();
-
-      const totalLapangan =
-        await prisma.lapangan.count();
-
-      const pemasukan =
-        await prisma.pembayaran.aggregate({
-          _sum: {
-            total_bayar: true,
-          },
-        });
-
-      res.json({
-        totalUsers,
-        totalOwners,
-        totalBooking,
-        totalLapangan,
-        totalPemasukan: Number(pemasukan._sum.total_bayar || 0),
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: error.message,
-      });
-    }
-  };
+export const getAdminDashboard = async (req, res) => {
+  try {
+    const data = await buildAdminDashboard();
+    res.json(serialize(data));
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
 
 
 // ================= OWNER =================
 
-export const getOwnerDashboard =
-  async (req, res) => {
-    try {
-      const ownerId = BigInt(req.user.id);
-
-      const totalLapangan =
-        await prisma.lapangan.count({
-          where: {
-            owner_id: ownerId,
-          },
-        });
-
-      const totalBooking =
-        await prisma.pesanan.count({
-          where: {
-            lapangan: {
-              owner_id: ownerId,
-            },
-          },
-        });
-
-      res.json({
-        totalLapangan,
-        totalBooking,
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: error.message,
-      });
-    }
-  };
+export const getOwnerDashboard = async (req, res) => {
+  try {
+    const data = await buildOwnerDashboard(req.user.id);
+    res.json(serialize(data));
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
 
 
 // ================= USER =================
@@ -154,28 +102,8 @@ export const getOwnerDashboard =
 export const getUserDashboard =
   async (req, res) => {
     try {
-      const userId = BigInt(req.user.id);
-
-      const totalPesanan =
-        await prisma.pesanan.count({
-          where: {
-            user_id: userId,
-          },
-        });
-
-      const totalPembayaran =
-        await prisma.pembayaran.count({
-          where: {
-            pesanan: {
-              user_id: userId,
-            },
-          },
-        });
-
-      res.json({
-        totalPesanan,
-        totalPembayaran,
-      });
+      const data = await buildUserDashboard(req.user.id);
+      res.json(serialize(data));
     } catch (error) {
       res.status(500).json({
         error: error.message,

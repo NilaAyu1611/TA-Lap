@@ -1,43 +1,27 @@
-// import express from "express";
-// import {
-//   getAllLapangan,
-//   createLapangan
-// } from "../controllers/lapanganController.js";
-
-// import { authMiddleware } from "../middlewares/authMiddleware.js";
-// import { roleMiddleware } from "../middlewares/roleMiddleware.js";
-
-// const router = express.Router();
-
-// router.get("/", getAllLapangan);
-
-// router.post(
-//   "/",
-//   authMiddleware,
-//   roleMiddleware("owner", "admin"),
-//   createLapangan
-// );
-
-// export default router;
-
-
 import express from "express";
 import {
-  getAllLapangan,
   createLapangan,
-  updateLapangan,
   deleteLapangan,
+  getAllLapangan,
+  getLapanganAvailability,
+  getLapanganById,
+  getPublicLapanganPreview,
+  reversePlace,
+  searchPlaces,
+  updateLapangan,
 } from "../controllers/lapanganController.js";
-
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import { roleMiddleware } from "../middlewares/roleMiddleware.js";
 
 const router = express.Router();
 
-// GET → semua role boleh
+router.get("/public", getPublicLapanganPreview);
+router.get("/places/search", searchPlaces);
+router.get("/places/reverse", reversePlace);
 router.get("/", authMiddleware, getAllLapangan);
+router.get("/:id/availability", authMiddleware, getLapanganAvailability);
+router.get("/:id", authMiddleware, getLapanganById);
 
-// CREATE → owner & admin
 router.post(
   "/",
   authMiddleware,
@@ -45,7 +29,6 @@ router.post(
   createLapangan
 );
 
-// UPDATE
 router.put(
   "/:id",
   authMiddleware,
@@ -53,7 +36,6 @@ router.put(
   updateLapangan
 );
 
-// DELETE
 router.delete(
   "/:id",
   authMiddleware,

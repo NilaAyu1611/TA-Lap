@@ -1,619 +1,267 @@
 "use client";
 
+import { CalendarDays, Loader2, Plus, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import {
-  Bell,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  CreditCard,
-  LogOut,
-  Menu,
-  Search,
-  User2,
-  X,
-  XCircle,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-import { useState } from "react";
-
-import ThemeToggle from "@/components/ThemeToggle";
+import PesananDetailModal from "@/components/admin/pesanan/PesananDetailModal";
+import PesananFilters from "@/components/admin/pesanan/PesananFilters";
+import PesananModal from "@/components/admin/pesanan/PesananModal";
+import PesananStatsSection from "@/components/admin/pesanan/PesananStats";
+import PesananTable from "@/components/admin/pesanan/PesananTable";
 import OwnerNavbar from "@/components/OwnerNavbar";
+import { usePesanan } from "@/hooks/usePesanan";
+import { getApiErrorMessage } from "@/hooks/usePesananFormOptions";
+import {
+  MetodePembayaran,
+  StatusPembayaran,
+} from "@/lib/pembayaran";
+import { upsertPembayaranByPesanan } from "@/services/pembayaran.service";
+import {
+  Pesanan,
+  PesananFormData,
+  PesananStatus,
+  PesananStatusFilter,
+} from "@/types/pesanan";
 
-const pesananData = [
-  {
-    id: 1,
-    customer: "Ahmad Fauzi",
-    lapangan: "Futsal Arena A",
-    tanggal: "19 Mei 2026",
-    jam: "19:00 - 21:00",
-    pembayaran: "QRIS",
-    total: "Rp 250.000",
-    status: "dibayar",
-  },
-  {
-    id: 2,
-    customer: "Rizky Ramadhan",
-    lapangan: "Badminton Court B",
-    tanggal: "20 Mei 2026",
-    jam: "13:00 - 15:00",
-    pembayaran: "Transfer",
-    total: "Rp 180.000",
-    status: "pending",
-  },
-  {
-    id: 3,
-    customer: "Dimas Saputra",
-    lapangan: "Mini Soccer Elite",
-    tanggal: "20 Mei 2026",
-    jam: "20:00 - 22:00",
-    pembayaran: "Tunai",
-    total: "Rp 500.000",
-    status: "selesai",
-  },
-];
+type ModalMode = "create" | "edit" | null;
 
 export default function OwnerPesananPage() {
-  const [mobileMenu, setMobileMenu] = useState(false);
+  const {
+    pesanan,
+    stats,
+    loading,
+    reload,
+    createPesanan,
+    updatePesanan,
+    updateStatus,
+  } = usePesanan();
+
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<PesananStatusFilter>("all");
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
+  const [selected, setSelected] = useState<Pesanan | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const filtered = useMemo(() => {
+    return pesanan.filter((item) => {
+      const q = search.toLowerCase();
+      const matchSearch =
+        item.kode_booking.toLowerCase().includes(q) ||
+        (item.user_name || "").toLowerCase().includes(q) ||
+        (item.user_email || "").toLowerCase().includes(q) ||
+        (item.lapangan_nama || "").toLowerCase().includes(q);
+
+      const matchStatus = status === "all" || item.status === status;
+
+      return matchSearch && matchStatus;
+    });
+  }, [pesanan, search, status]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const updated = pesanan.find((item) => item.id === selected.id);
+    if (updated) setSelected(updated);
+  }, [pesanan, selected?.id]);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const openCreate = () => {
+    setSelected(null);
+    setModalMode("create");
+  };
+
+  const openEdit = (item: Pesanan) => {
+    setSelected(item);
+    setModalMode("edit");
+  };
+
+  const openDetail = (item: Pesanan) => {
+    setSelected(item);
+    setDetailOpen(true);
+  };
+
+  const handleSubmit = async (data: PesananFormData) => {
+    try {
+      if (modalMode === "create") {
+        await createPesanan(data);
+        showToast(
+          "success",
+          "Booking walk-in berhasil dicatat"
+        );
+      } else if (modalMode === "edit" && selected) {
+        await updatePesanan(selected.id, data);
+        showToast("success", "Pesanan berhasil diperbarui");
+      }
+      setModalMode(null);
+    } catch (err: unknown) {
+      const message = getApiErrorMessage(err);
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: PesananStatus) => {
+    try {
+      await updateStatus(id, newStatus);
+      showToast("success", "Status pesanan diperbarui");
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Gagal mengubah status";
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleUpdatePayment = async (
+    id: string,
+    data: { metode: MetodePembayaran; status: StatusPembayaran }
+  ) => {
+    try {
+      await upsertPembayaranByPesanan(id, data);
+      await reload();
+      showToast("success", "Pembayaran berhasil disimpan");
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Gagal menyimpan pembayaran";
+      showToast("error", message);
+      throw err;
+    }
+  };
 
   return (
-    <main
-      className="
-        min-h-screen
-        bg-gray-50
-        text-gray-900
+    <main className="relative min-h-screen bg-gray-50 text-gray-900 transition-all duration-300 dark:bg-[#020617] dark:text-white">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl" />
+      </div>
 
-        dark:bg-[#020817]
-        dark:text-white
-
-        transition-all
-        duration-300
-      "
-    >
-      {/* BACKGROUND */}
-      <div
-        className="
-          fixed
-          inset-0
-          -z-10
-
-          bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.15),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(168,85,247,0.12),transparent_25%)]
-        "
-      />
-
-      {/* NAVBAR */}
       <OwnerNavbar active="pesanan" />
 
-      {/* CONTENT */}
-      <section
-        className="
-          mx-auto
-          max-w-7xl
-
-          px-6
-          py-10
-        "
-      >
-        {/* HERO */}
-        <div
-          className="
-            relative
-            overflow-hidden
-
-            rounded-[32px]
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-8
-            md:p-10
-
-            shadow-sm
-          "
-        >
-          {/* GLOW */}
+      <section className="relative z-10 mx-auto max-w-7xl px-4 py-8 md:px-6">
+        {toast && (
           <div
-            className="
-              absolute
-              right-[-100px]
-              top-[-100px]
-
-              h-72
-              w-72
-
-              rounded-full
-
-              bg-cyan-500/10
-
-              blur-3xl
-            "
-          />
-
-          <div className="relative z-10">
-            <div
-              className="
-                inline-flex
-                items-center
-                gap-2
-
-                rounded-full
-
-                bg-cyan-500/10
-
-                px-4
-                py-2
-
-                text-sm
-                font-semibold
-                text-cyan-500
-              "
-            >
-              <CalendarDays size={16} />
-              OWNER PESANAN
-            </div>
-
-            <h2
-              className="
-                mt-6
-
-                text-4xl
-                font-black
-                tracking-tight
-
-                md:text-5xl
-              "
-            >
-              Kelola Semua Pesanan Pelanggan
-            </h2>
-
-            <p
-              className="
-                mt-5
-                max-w-3xl
-
-                text-base
-                leading-8
-
-                text-gray-600
-                dark:text-gray-300
-              "
-            >
-              Monitor seluruh aktivitas booking, status pembayaran,
-              dan jadwal lapangan secara realtime melalui panel owner.
-            </p>
-          </div>
-        </div>
-
-        {/* FILTER */}
-        <div
-          className="
-            mt-10
-
-            flex
-            flex-col
-            gap-4
-
-            lg:flex-row
-            lg:items-center
-            lg:justify-between
-          "
-        >
-          {/* SEARCH */}
-          <div
-            className="
-              flex
-              items-center
-              gap-3
-
-              rounded-2xl
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              px-4
-              py-3
-
-              lg:w-[350px]
-            "
+            className={`fixed right-6 top-24 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${
+              toast.type === "success"
+                ? "bg-emerald-600 text-white"
+                : "bg-red-600 text-white"
+            }`}
           >
-            <Search
-              size={18}
-              className="text-gray-400"
-            />
-
-            <input
-              type="text"
-              placeholder="Cari pesanan..."
-              className="
-                w-full
-                bg-transparent
-                outline-none
-
-                placeholder:text-gray-400
-              "
-            />
+            {toast.message}
           </div>
+        )}
 
-          {/* FILTER BUTTON */}
-          <div className="flex flex-wrap gap-3">
-            <button
-              className="
-                rounded-2xl
-                bg-cyan-500
-                px-5
-                py-3
-                text-sm
-                font-semibold
-                text-white
-              "
-            >
-              Semua
-            </button>
-
-            <button
-              className="
-                rounded-2xl
-                border
-                border-gray-300
-                dark:border-white/10
-
-                px-5
-                py-3
-
-                text-sm
-                font-medium
-              "
-            >
-              Pending
-            </button>
-
-            <button
-              className="
-                rounded-2xl
-                border
-                border-gray-300
-                dark:border-white/10
-
-                px-5
-                py-3
-
-                text-sm
-                font-medium
-              "
-            >
-              Dibayar
-            </button>
-
-            <button
-              className="
-                rounded-2xl
-                border
-                border-gray-300
-                dark:border-white/10
-
-                px-5
-                py-3
-
-                text-sm
-                font-medium
-              "
-            >
-              Selesai
-            </button>
+        {loading ? (
+          <div className="flex min-h-[400px] items-center justify-center">
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <Loader2 className="animate-spin" size={20} />
+              <span>Memuat pesanan lapangan Anda...</span>
+            </div>
           </div>
-        </div>
-
-        {/* LIST PESANAN */}
-        <div
-          className="
-            mt-8
-
-            grid
-            gap-6
-          "
-        >
-          {pesananData.map((item) => (
-            <div
-              key={item.id}
-              className="
-                rounded-[28px]
-
-                border
-                border-gray-200
-                dark:border-white/10
-
-                bg-white
-                dark:bg-white/5
-
-                p-6
-
-                transition-all
-                duration-300
-
-                hover:-translate-y-1
-                hover:border-cyan-500/30
-              "
-            >
-              <div
-                className="
-                  flex
-                  flex-col
-                  gap-6
-
-                  xl:flex-row
-                  xl:items-center
-                  xl:justify-between
-                "
-              >
-                {/* LEFT */}
-                <div className="flex gap-5">
-                  {/* ICON */}
-                  <div
-                    className="
-                      flex
-                      h-16
-                      w-16
-                      items-center
-                      justify-center
-
-                      rounded-2xl
-
-                      bg-cyan-500/10
-                    "
-                  >
-                    <User2 className="text-cyan-500" />
-                  </div>
-
-                  {/* INFO */}
-                  <div>
-                    <h3
-                      className="
-                        text-2xl
-                        font-bold
-                      "
-                    >
-                      {item.customer}
-                    </h3>
-
-                    <p
-                      className="
-                        mt-1
-                        text-sm
-
-                        text-gray-500
-                        dark:text-gray-400
-                      "
-                    >
-                      {item.lapangan}
-                    </p>
-
-                    <div
-                      className="
-                        mt-5
-
-                        flex
-                        flex-wrap
-                        gap-3
-                      "
-                    >
-                      <div
-                        className="
-                          flex
-                          items-center
-                          gap-2
-
-                          rounded-xl
-
-                          bg-gray-100
-                          dark:bg-white/5
-
-                          px-4
-                          py-2
-
-                          text-sm
-                        "
-                      >
-                        <CalendarDays size={16} />
-                        {item.tanggal}
-                      </div>
-
-                      <div
-                        className="
-                          flex
-                          items-center
-                          gap-2
-
-                          rounded-xl
-
-                          bg-gray-100
-                          dark:bg-white/5
-
-                          px-4
-                          py-2
-
-                          text-sm
-                        "
-                      >
-                        <Clock3 size={16} />
-                        {item.jam}
-                      </div>
-
-                      <div
-                        className="
-                          flex
-                          items-center
-                          gap-2
-
-                          rounded-xl
-
-                          bg-gray-100
-                          dark:bg-white/5
-
-                          px-4
-                          py-2
-
-                          text-sm
-                        "
-                      >
-                        <CreditCard size={16} />
-                        {item.pembayaran}
-                      </div>
-                    </div>
-                  </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-cyan-50 via-white to-white p-6 shadow-sm dark:border-white/10 dark:from-cyan-950/20 dark:via-gray-900/50 dark:to-gray-900/50">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+                    <CalendarDays size={14} />
+                    Booking Lapangan
+                  </p>
+                  <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+                    Kelola Pesanan
+                  </h1>
+                  <p className="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
+                    Daftarkan pelanggan yang datang langsung ke venue — cukup
+                    isi nama dan nomor HP. Email opsional. Pelanggan belum perlu
+                    punya akun; booking terekap di sistem.
+                  </p>
                 </div>
 
-                {/* RIGHT */}
-                <div
-                  className="
-                    flex
-                    flex-col
-                    items-start
-                    gap-4
-
-                    xl:items-end
-                  "
-                >
-                  <h4
-                    className="
-                      text-3xl
-                      font-black
-                    "
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={reload}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:border-cyan-200 dark:border-white/10 dark:bg-white/5"
                   >
-                    {item.total}
-                  </h4>
-
-                  {/* STATUS */}
-                  {item.status === "dibayar" && (
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-full
-
-                        bg-green-500/10
-
-                        px-5
-                        py-2
-
-                        text-sm
-                        font-semibold
-                        text-green-500
-                      "
-                    >
-                      <CheckCircle2 size={16} />
-                      Dibayar
-                    </div>
-                  )}
-
-                  {item.status === "pending" && (
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-full
-
-                        bg-yellow-500/10
-
-                        px-5
-                        py-2
-
-                        text-sm
-                        font-semibold
-                        text-yellow-500
-                      "
-                    >
-                      <Clock3 size={16} />
-                      Pending
-                    </div>
-                  )}
-
-                  {item.status === "selesai" && (
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-full
-
-                        bg-red-500/10
-
-                        px-5
-                        py-2
-
-                        text-sm
-                        font-semibold
-                        text-red-500
-                      "
-                    >
-                      <XCircle size={16} />
-                      Selesai
-                    </div>
-                  )}
-
-                  {/* BUTTON */}
-                  <div className="flex gap-3">
-                    <button
-                      className="
-                        rounded-2xl
-
-                        border
-                        border-gray-300
-                        dark:border-white/10
-
-                        px-5
-                        py-3
-
-                        text-sm
-                        font-medium
-
-                        transition
-
-                        hover:border-cyan-500
-                      "
-                    >
-                      Detail
-                    </button>
-
-                    <button
-                      className="
-                        rounded-2xl
-
-                        bg-cyan-500
-
-                        px-5
-                        py-3
-
-                        text-sm
-                        font-semibold
-                        text-white
-
-                        transition
-
-                        hover:bg-cyan-400
-                      "
-                    >
-                      Kelola
-                    </button>
-                  </div>
+                    <RefreshCw size={16} />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={openCreate}
+                    className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-cyan-500"
+                  >
+                    <Plus size={16} />
+                    Booking Walk-in
+                  </button>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+
+            <PesananStatsSection stats={stats} />
+
+            <div className="rounded-xl border border-gray-200/80 bg-white p-4 text-sm text-gray-600 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-400">
+              Isi data pelanggan manual saat mereka datang ke venue — nomor HP
+              wajib, email opsional. Pelanggan tidak perlu daftar akun dulu.
+              Setelah pembayaran sukses, transaksi muncul di{" "}
+              <Link
+                href="/owner/pembayaran"
+                className="font-medium text-cyan-700 hover:underline dark:text-cyan-400"
+              >
+                Monitoring Pembayaran
+              </Link>
+              .
+            </div>
+
+            <PesananFilters
+              search={search}
+              setSearch={setSearch}
+              status={status}
+              setStatus={setStatus}
+              totalCount={filtered.length}
+              searchPlaceholder="Cari kode, customer, lapangan..."
+            />
+
+            <PesananTable
+              pesanan={filtered}
+              variant="owner"
+              emptyMessage={
+                search || status !== "all"
+                  ? "Tidak ada pesanan yang cocok dengan filter"
+                  : "Belum ada pesanan — klik Booking Walk-in untuk pelanggan datang langsung"
+              }
+              onDetail={openDetail}
+              onEdit={openEdit}
+            />
+          </div>
+        )}
       </section>
+
+      <PesananModal
+        open={modalMode !== null}
+        mode={modalMode === "create" ? "create" : "edit"}
+        variant="owner"
+        onClose={() => setModalMode(null)}
+        onSubmit={handleSubmit}
+        initialData={selected}
+      />
+
+      <PesananDetailModal
+        open={detailOpen}
+        pesanan={selected}
+        variant="owner"
+        onClose={() => setDetailOpen(false)}
+        onEdit={openEdit}
+        onUpdateStatus={handleUpdateStatus}
+        onUpdatePayment={handleUpdatePayment}
+      />
     </main>
   );
 }

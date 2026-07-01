@@ -1,577 +1,288 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Loader2, Plus, RefreshCw } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
-import AdminTable from "@/components/admin/table/AdminTable";
-import StatusBadge from "@/components/admin/table/StatusBadge";
-import TableAction from "@/components/admin/table/TableAction";
+import DeletePesananDialog from "@/components/admin/pesanan/DeletePesananDialog";
+import PesananDetailModal from "@/components/admin/pesanan/PesananDetailModal";
+import PesananFilters from "@/components/admin/pesanan/PesananFilters";
+import PesananModal from "@/components/admin/pesanan/PesananModal";
+import PesananStatsSection from "@/components/admin/pesanan/PesananStats";
+import PesananTable from "@/components/admin/pesanan/PesananTable";
+import { usePesanan } from "@/hooks/usePesanan";
+import { usePesananFormOptions, getApiErrorMessage } from "@/hooks/usePesananFormOptions";
+import { upsertPembayaranByPesanan } from "@/services/pembayaran.service";
 import {
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  CreditCard,
-  Eye,
-  Filter,
-  Search,
-  User2,
-  XCircle,
-} from "lucide-react";
-import { getAllPesanan } from "@/services/pesanan.service";
-import { formatDate, formatRupiah, formatTime } from "@/lib/auth";
+  MetodePembayaran,
+  StatusPembayaran,
+} from "@/lib/pembayaran";
+import {
+  Pesanan,
+  PesananFormData,
+  PesananStatus,
+  PesananStatusFilter,
+} from "@/types/pesanan";
 
-type PesananRow = {
-  id: string;
-  kode_booking?: string;
-  status: string;
-  total_harga: number | string;
-  tanggal_booking: string;
-  jam_mulai: string;
-  jam_selesai: string;
-  user?: { name: string };
-  lapangan?: { nama: string; owner?: { name: string } };
-  pembayaran?: { metode: string };
-};
+type ModalMode = "create" | "edit" | null;
 
-export default function AdminPesananPage() {
-  const [pesananData, setPesananData] = useState<PesananRow[]>([]);
-  const [loading, setLoading] = useState(true);
+function AdminPesananPageContent() {
+  const searchParams = useSearchParams();
+  const {
+    pesanan,
+    stats,
+    loading,
+    reload,
+    createPesanan,
+    updatePesanan,
+    updateStatus,
+    deletePesanan,
+  } = usePesanan();
+
+  usePesananFormOptions(true);
+
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<PesananStatusFilter>("all");
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const result = await getAllPesanan();
-        setPesananData(result.data || []);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
+    const q = searchParams.get("q");
+    if (q) setSearch(q);
+  }, [searchParams]);
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
+  const [selected, setSelected] = useState<Pesanan | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const filtered = useMemo(() => {
+    return pesanan.filter((item) => {
+      const q = search.toLowerCase();
+      const matchSearch =
+        item.kode_booking.toLowerCase().includes(q) ||
+        (item.user_name || "").toLowerCase().includes(q) ||
+        (item.user_email || "").toLowerCase().includes(q) ||
+        (item.lapangan_nama || "").toLowerCase().includes(q) ||
+        (item.owner_name || "").toLowerCase().includes(q);
+
+      const matchStatus = status === "all" || item.status === status;
+
+      return matchSearch && matchStatus;
+    });
+  }, [pesanan, search, status]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const updated = pesanan.find((item) => item.id === selected.id);
+    if (updated) setSelected(updated);
+  }, [pesanan, selected?.id]);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const openCreate = () => {
+    setSelected(null);
+    setModalMode("create");
+  };
+
+  const openEdit = (item: Pesanan) => {
+    setSelected(item);
+    setModalMode("edit");
+  };
+
+  const openDetail = (item: Pesanan) => {
+    setSelected(item);
+    setDetailOpen(true);
+  };
+
+  const openDelete = (item: Pesanan) => {
+    setSelected(item);
+    setDeleteOpen(true);
+  };
+
+  const handleSubmit = async (data: PesananFormData) => {
+    try {
+      if (modalMode === "create") {
+        await createPesanan(data);
+        showToast("success", "Pesanan berhasil dibuat");
+      } else if (modalMode === "edit" && selected) {
+        await updatePesanan(selected.id, data);
+        showToast("success", "Pesanan berhasil diperbarui");
       }
-    };
-    fetchData();
-  }, []);
+      setModalMode(null);
+    } catch (err: unknown) {
+      const message = getApiErrorMessage(err);
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selected) return;
+    try {
+      await deletePesanan(selected.id);
+      showToast("success", "Pesanan berhasil dihapus");
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Gagal menghapus pesanan";
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: PesananStatus) => {
+    try {
+      await updateStatus(id, newStatus);
+      showToast("success", "Status pesanan diperbarui");
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Gagal mengubah status";
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleUpdatePayment = async (
+    id: string,
+    data: { metode: MetodePembayaran; status: StatusPembayaran }
+  ) => {
+    try {
+      await upsertPembayaranByPesanan(id, data);
+      await reload();
+      showToast("success", "Pembayaran berhasil disimpan");
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Gagal menyimpan pembayaran";
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2 className="animate-spin" size={20} />
+          <span>Memuat data pesanan...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      {/* HEADER */}
-      <div>
-        <p className="text-sm font-medium text-cyan-500">
-          ADMIN PESANAN
-        </p>
-
-        <h1
-          className="
-            mt-2
-            text-4xl
-            font-black
-            tracking-tight
-          "
-        >
-          Manajemen Pesanan
-        </h1>
-
-        <p
-          className="
-            mt-3
-            max-w-3xl
-
-            text-gray-500
-            dark:text-gray-400
-          "
-        >
-          Kelola seluruh aktivitas booking pelanggan,
-          status pembayaran, dan monitoring transaksi
-          pemesanan lapangan secara realtime.
-        </p>
-      </div>
-
-      {/* STATS */}
-      <div
-        className="
-          grid
-          gap-6
-
-          md:grid-cols-2
-          xl:grid-cols-4
-        "
-      >
-        {/* CARD */}
+    <div className="space-y-6">
+      {toast && (
         <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
+          className={`fixed right-6 top-24 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Total Pesanan
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                1.240
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-cyan-500/10
-              "
-            >
-              <CalendarDays className="text-cyan-500" />
-            </div>
-          </div>
+          {toast.message}
         </div>
+      )}
 
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Pending
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                84
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-yellow-500/10
-              "
-            >
-              <Clock3 className="text-yellow-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Dibayar
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                982
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-green-500/10
-              "
-            >
-              <CheckCircle2 className="text-green-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Selesai
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                756
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-red-500/10
-              "
-            >
-              <XCircle className="text-red-500" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* FILTER */}
-      <div
-        className="
-          flex
-          flex-col
-          gap-4
-
-          lg:flex-row
-          lg:items-center
-          lg:justify-between
-        "
-      >
-        {/* SEARCH */}
-        <div
-          className="
-            flex
-            items-center
-            gap-3
-
-            rounded-2xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            px-4
-            py-3
-
-            lg:w-[400px]
-          "
-        >
-          <Search
-            size={18}
-            className="text-gray-400"
-          />
-
-          <input
-            type="text"
-            placeholder="Cari pesanan..."
-            className="
-              w-full
-              bg-transparent
-              outline-none
-
-              placeholder:text-gray-400
-            "
-          />
-        </div>
-
-        {/* ACTION */}
-        <div className="flex gap-3">
-          <button
-            className="
-              flex
-              items-center
-              gap-2
-
-              rounded-2xl
-
-              border
-              border-gray-300
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-            "
-          >
-            <Filter size={18} />
-            Filter
-          </button>
-
-          <button
-            className="
-              rounded-2xl
-
-              bg-cyan-500
-
-              px-5
-              py-3
-
-              text-sm
-              font-semibold
-              text-white
-
-              transition
-              hover:bg-cyan-400
-            "
-          >
-            Export Data
-          </button>
-        </div>
-      </div>
-
-      {/* TABLE */}
-      <AdminTable
-  headers={[
-    "Customer",
-    "Owner",
-    "Lapangan",
-    "Tanggal",
-    "Pembayaran",
-    "Total",
-    "Status",
-    "Aksi",
-  ]}
->
-  {loading && (
-    <tr>
-      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-        Memuat pesanan...
-      </td>
-    </tr>
-  )}
-  {!loading && pesananData.length === 0 && (
-    <tr>
-      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-        Belum ada pesanan.
-      </td>
-    </tr>
-  )}
-  {pesananData.map((item) => (
-    <tr
-      key={item.id}
-      className="
-        border-b
-        border-gray-200
-        dark:border-white/5
-
-        transition
-        hover:bg-gray-100/70
-        dark:hover:bg-white/[0.03]
-      "
-    >
-      {/* CUSTOMER */}
-      <td className="px-6 py-5">
-        <div className="flex items-center gap-4">
-          <div
-            className="
-              flex
-              h-12
-              w-12
-              items-center
-              justify-center
-
-              rounded-2xl
-
-              bg-cyan-500/10
-            "
-          >
-            <User2 className="text-cyan-500" />
-          </div>
-
+      <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-cyan-50 via-white to-white p-6 shadow-sm dark:border-white/10 dark:from-cyan-950/20 dark:via-gray-900/50 dark:to-gray-900/50">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-semibold">
-              {item.user?.name || "-"}
-            </h3>
-
-            <p
-              className="
-                mt-1
-                text-sm
-                text-gray-500
-                dark:text-gray-400
-              "
-            >
-              User Booking
+            <p className="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+              Manajemen Booking
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+              Kelola Pesanan
+            </h1>
+            <p className="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
+              Pantau dan kelola seluruh booking pelanggan, status pembayaran,
+              dan jadwal lapangan dari satu tempat.
             </p>
           </div>
-        </div>
-      </td>
 
-      {/* OWNER */}
-      <td className="px-6 py-5 whitespace-nowrap">
-        {item.lapangan?.owner?.name || "-"}
-      </td>
-
-      {/* LAPANGAN */}
-      <td className="px-6 py-5 whitespace-nowrap">
-        {item.lapangan?.nama || "-"}
-      </td>
-
-      {/* DATE */}
-      <td className="px-6 py-5 whitespace-nowrap">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <CalendarDays size={16} />
-            {formatDate(item.tanggal_booking)}
+          <div className="flex gap-2">
+            <button
+              onClick={reload}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-cyan-200 hover:text-cyan-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+            >
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-cyan-600/20 transition hover:bg-cyan-500"
+            >
+              <Plus size={16} />
+              Tambah Pesanan
+            </button>
           </div>
-
-          <p className="text-sm text-gray-500">
-            {formatTime(item.jam_mulai)} - {formatTime(item.jam_selesai)}
-          </p>
         </div>
-      </td>
+      </div>
 
-      {/* PAYMENT */}
-      <td className="px-6 py-5 whitespace-nowrap">
-        <div
-          className="
-            inline-flex
-            items-center
-            gap-2
+      <PesananStatsSection stats={stats} />
 
-            rounded-xl
+      <PesananFilters
+        search={search}
+        setSearch={setSearch}
+        status={status}
+        setStatus={setStatus}
+        totalCount={filtered.length}
+      />
 
-            bg-gray-100
-            dark:bg-white/5
+      <PesananTable
+        pesanan={filtered}
+        emptyMessage={
+          search || status !== "all"
+            ? "Tidak ada pesanan yang cocok dengan filter"
+            : "Belum ada data pesanan"
+        }
+        onDetail={openDetail}
+        onEdit={openEdit}
+        onDelete={openDelete}
+      />
 
-            px-4
-            py-2
+      <PesananModal
+        open={modalMode !== null}
+        mode={modalMode === "create" ? "create" : "edit"}
+        onClose={() => setModalMode(null)}
+        onSubmit={handleSubmit}
+        initialData={selected}
+      />
 
-            text-sm
-          "
-        >
-          <CreditCard size={16} />
-          {item.pembayaran?.metode || "-"}
-        </div>
-      </td>
+      <PesananDetailModal
+        open={detailOpen}
+        pesanan={selected}
+        onClose={() => setDetailOpen(false)}
+        onEdit={openEdit}
+        onUpdateStatus={handleUpdateStatus}
+        onUpdatePayment={handleUpdatePayment}
+      />
 
-      {/* TOTAL */}
-      <td
-        className="
-          px-6
-          py-5
-
-          font-bold
-          whitespace-nowrap
-        "
-      >
-        {formatRupiah(item.total_harga)}
-      </td>
-
-      {/* STATUS */}
-      <td className="px-6 py-5 whitespace-nowrap">
-        <StatusBadge status={item.status} />
-      </td>
-
-      {/* ACTION */}
-      <td className="px-6 py-5 whitespace-nowrap">
-        <TableAction />
-      </td>
-    </tr>
-  ))}
-</AdminTable>
+      <DeletePesananDialog
+        open={deleteOpen}
+        pesanan={selected}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+      />
     </div>
+  );
+}
+
+export default function AdminPesananPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[400px] items-center justify-center text-sm text-gray-500">
+          Memuat pesanan...
+        </div>
+      }
+    >
+      <AdminPesananPageContent />
+    </Suspense>
   );
 }

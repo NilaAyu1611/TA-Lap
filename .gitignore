@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment (jangan commit secret)
+.env
+.env.local
+.env.*.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Uploads lokal (Railway pakai disk sementara)
+ta-lap-be/uploads/*
+!ta-lap-be/uploads/.gitkeep
+
+# Build
+ta-lap-fe/.next/
+ta-lap-fe/out/
+ta-lap-fe/.vercel/
+
+# Prisma generated (optional local)
+ta-lap-be/node_modules/.prisma/

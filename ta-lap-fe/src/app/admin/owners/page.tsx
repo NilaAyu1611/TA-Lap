@@ -1,924 +1,342 @@
-/* =========================================================
-   FILE:
-   app/admin/owners/page.tsx
-   ========================================================= */
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { Loader2, Plus, RefreshCw, ShieldAlert } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
-import {
-  Building2,
-  CheckCircle2,
-  Eye,
-  Mail,
-  MapPin,
-  MoreHorizontal,
-  Phone,
-  Plus,
-  Search,
-  ShieldCheck,
-  Store,
-  Trophy,
-  User2,
-  XCircle,
-} from "lucide-react";
-import { getOwners } from "@/services/owner.service";
+import AddOwnerLapanganModal from "@/components/admin/owners/AddOwnerLapanganModal";
+import DeleteOwnerDialog from "@/components/admin/owners/DeleteOwnerDialog";
+import OwnerDetailModal from "@/components/admin/owners/OwnerDetailModal";
+import OwnerFilters, {
+  matchesOwnerActivity,
+} from "@/components/admin/owners/OwnerFilters";
+import OwnerModal from "@/components/admin/owners/OwnerModal";
+import OwnerStatsSection from "@/components/admin/owners/OwnerStats";
+import OwnersTable from "@/components/admin/owners/OwnersTable";
+import { useOwners } from "@/hooks/useOwners";
+import { Owner, OwnerActivityFilter, OwnerFormData, OwnerStatus } from "@/types/owner";
 
-type Owner = {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  city?: string;
-  status: string;
-};
+type ModalMode = "create" | "edit" | null;
 
-export default function AdminOwnersPage() {
-  const [owners, setOwners] = useState<Owner[]>([]);
-  const [loading, setLoading] = useState(true);
+function AdminOwnersContent() {
+  const searchParams = useSearchParams();
+  const { owners, stats, loading, error, reload, createOwner, updateOwner, deleteOwner, approveOwner, rejectOwner, actionLoading } =
+    useOwners();
+
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<"all" | OwnerStatus>("all");
+  const [activity, setActivity] = useState<OwnerActivityFilter>("all");
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
+  const [selectedOwner, setSelectedOwner] = useState<Owner | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [lapanganOpen, setLapanganOpen] = useState(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const result = await getOwners();
-        setOwners(result.data || []);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+    if (searchParams.get("review") === "pending") {
+      setActivity("menunggu_verifikasi");
+      setStatus("pending");
+    }
+    const q = searchParams.get("q");
+    if (q) setSearch(q);
+  }, [searchParams]);
 
-  const filteredOwners = owners.filter(
-    (o) =>
-      o.name.toLowerCase().includes(search.toLowerCase()) ||
-      o.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredOwners = useMemo(() => {
+    return owners.filter((owner) => {
+      const matchSearch =
+        owner.name.toLowerCase().includes(search.toLowerCase()) ||
+        owner.email.toLowerCase().includes(search.toLowerCase()) ||
+        (owner.phone || "").includes(search) ||
+        (owner.city || "").toLowerCase().includes(search.toLowerCase());
+
+      const matchStatus = status === "all" || owner.status === status;
+      const matchActivity = matchesOwnerActivity(owner, activity);
+      return matchSearch && matchStatus && matchActivity;
+    });
+  }, [owners, search, status, activity]);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const openCreate = () => {
+    setSelectedOwner(null);
+    setModalMode("create");
+  };
+
+  const openEdit = (owner: Owner) => {
+    setSelectedOwner(owner);
+    setModalMode("edit");
+  };
+
+  const openDetail = (owner: Owner) => {
+    setSelectedOwner(owner);
+    setDetailOpen(true);
+  };
+
+  const openDelete = (owner: Owner) => {
+    setSelectedOwner(owner);
+    setDeleteOpen(true);
+  };
+
+  const openAddLapangan = (owner: Owner) => {
+    setSelectedOwner(owner);
+    setLapanganOpen(true);
+  };
+
+  const handleSubmit = async (data: OwnerFormData) => {
+    try {
+      if (modalMode === "create") {
+        await createOwner(data);
+        showToast(
+          "success",
+          "Owner berhasil ditambahkan. Tambahkan lapangan lewat Detail."
+        );
+      } else if (modalMode === "edit" && selectedOwner) {
+        await updateOwner(selectedOwner.id, data);
+        showToast("success", "Data owner berhasil diperbarui");
+      }
+      setModalMode(null);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Terjadi kesalahan";
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedOwner) return;
+    await deleteOwner(selectedOwner.id);
+    showToast("success", "Owner berhasil dihapus");
+  };
+
+  const handleApprove = async (owner: Owner) => {
+    try {
+      const result = await approveOwner(owner.id);
+      showToast("success", result.message);
+      setDetailOpen(false);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Gagal menyetujui owner";
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleReject = async (owner: Owner, notes: string) => {
+    try {
+      const result = await rejectOwner(owner.id, notes);
+      showToast("success", result.message);
+      setDetailOpen(false);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Gagal menolak pendaftaran";
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleLapanganAdded = async () => {
+    await reload();
+    if (selectedOwner) {
+      const updated = (await reload(), owners.find((o) => o.id === selectedOwner.id));
+      if (updated) setSelectedOwner(updated);
+    }
+    showToast("success", "Lapangan berhasil ditambahkan");
+  };
 
   if (loading) {
-    return <div className="p-10 text-center">Loading owners...</div>;
-  }
-  return (
-    <div className="space-y-8">
-      {/* =========================================================
-          HEADER
-      ========================================================= */}
-      <div
-        className="
-          flex
-          flex-col
-          gap-5
-
-          xl:flex-row
-          xl:items-center
-          xl:justify-between
-        "
-      >
-        <div>
-          <p
-            className="
-              text-sm
-              font-semibold
-              uppercase
-              tracking-[0.2em]
-
-              text-cyan-500
-            "
-          >
-            Admin Owners
-          </p>
-
-          <h1
-            className="
-              mt-2
-
-              text-4xl
-              font-black
-              tracking-tight
-            "
-          >
-            Kelola Owner Venue
-          </h1>
-
-          <p
-            className="
-              mt-3
-              max-w-3xl
-
-              text-base
-              leading-8
-
-              text-gray-600
-              dark:text-gray-400
-            "
-          >
-            Monitoring seluruh owner lapangan, status venue,
-            dan aktivitas bisnis secara realtime.
-          </p>
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2 className="animate-spin" size={20} />
+          <span>Memuat data owner...</span>
         </div>
+      </div>
+    );
+  }
 
-        {/* ACTION */}
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 dark:border-red-500/30 dark:bg-red-500/10">
+        <p className="font-medium text-red-700 dark:text-red-300">
+          Gagal memuat data owner
+        </p>
+        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
         <button
-          className="
-            inline-flex
-            items-center
-            gap-3
-
-            rounded-2xl
-
-            bg-cyan-500
-
-            px-6
-            py-4
-
-            text-sm
-            font-semibold
-            text-white
-
-            shadow-lg
-            shadow-cyan-500/20
-
-            transition-all
-            duration-300
-
-            hover:scale-[1.02]
-            hover:bg-cyan-400
-          "
+          onClick={reload}
+          className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
         >
-          <Plus size={18} />
-          Tambah Owner
+          Coba Lagi
         </button>
       </div>
+    );
+  }
 
-      {/* =========================================================
-          STATS
-      ========================================================= */}
-      <div
-        className="
-          grid
-          gap-6
+  const currentOwner =
+    selectedOwner && owners.find((o) => o.id === selectedOwner.id)
+      ? owners.find((o) => o.id === selectedOwner.id)!
+      : selectedOwner;
 
-          md:grid-cols-2
-          xl:grid-cols-4
-        "
-      >
-        {/* CARD */}
+  return (
+    <div className="space-y-6">
+      {toast && (
         <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-
-            shadow-sm
-          "
+          className={`fixed right-6 top-24 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Total Owner
-              </p>
-
-              <h3
-                className="
-                  mt-3
-
-                  text-4xl
-                  font-black
-                "
-              >
-                152
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-16
-                w-16
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-cyan-500/10
-              "
-            >
-              <User2 className="text-cyan-500" />
-            </div>
-          </div>
+          {toast.message}
         </div>
+      )}
 
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-
-            shadow-sm
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Owner Aktif
-              </p>
-
-              <h3
-                className="
-                  mt-3
-
-                  text-4xl
-                  font-black
-                "
-              >
-                132
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-16
-                w-16
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-green-500/10
-              "
-            >
-              <CheckCircle2 className="text-green-500" />
-            </div>
+      <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-cyan-50 via-white to-white p-6 shadow-sm dark:border-white/10 dark:from-cyan-950/20 dark:via-gray-900/50 dark:to-gray-900/50">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+              Manajemen Owner
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+              Kelola Owner
+            </h1>
+            <p className="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
+              Buat akun owner, verifikasi, dan kelola lapangan venue.
+            </p>
           </div>
-        </div>
 
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-
-            shadow-sm
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Pending Review
-              </p>
-
-              <h3
-                className="
-                  mt-3
-
-                  text-4xl
-                  font-black
-                "
-              >
-                12
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-16
-                w-16
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-yellow-500/10
-              "
+          <div className="flex gap-2">
+            <button
+              onClick={reload}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-cyan-200 hover:text-cyan-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
             >
-              <ShieldCheck className="text-yellow-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-
-            shadow-sm
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Venue Aktif
-              </p>
-
-              <h3
-                className="
-                  mt-3
-
-                  text-4xl
-                  font-black
-                "
-              >
-                248
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-16
-                w-16
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-purple-500/10
-              "
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-cyan-600/20 transition hover:bg-cyan-500"
             >
-              <Building2 className="text-purple-500" />
-            </div>
+              <Plus size={16} />
+              Tambah Owner
+            </button>
           </div>
         </div>
       </div>
 
-      {/* =========================================================
-          FILTER
-      ========================================================= */}
-      <div
-        className="
-          flex
-          flex-col
-          gap-4
-
-          xl:flex-row
-          xl:items-center
-          xl:justify-between
-        "
-      >
-        {/* SEARCH */}
-        <div
-          className="
-            flex
-            items-center
-            gap-3
-
-            rounded-2xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            px-5
-            py-4
-
-            xl:w-[420px]
-          "
-        >
-          <Search
-            size={18}
-            className="text-gray-400"
-          />
-
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari owner..."
-            className="
-              w-full
-              bg-transparent
-              outline-none
-
-              placeholder:text-gray-400
-            "
-          />
-        </div>
-
-        {/* FILTER */}
-        <div className="flex flex-wrap gap-3">
-          <button
-            className="
-              rounded-2xl
-
-              bg-cyan-500
-
-              px-5
-              py-3
-
-              text-sm
-              font-semibold
-              text-white
-            "
-          >
-            Semua
-          </button>
-
-          <button
-            className="
-              rounded-2xl
-
-              border
-              border-gray-300
-              dark:border-white/10
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-            "
-          >
-            Aktif
-          </button>
-
-          <button
-            className="
-              rounded-2xl
-
-              border
-              border-gray-300
-              dark:border-white/10
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-            "
-          >
-            Pending
-          </button>
-
-          <button
-            className="
-              rounded-2xl
-
-              border
-              border-gray-300
-              dark:border-white/10
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-            "
-          >
-            Diblokir
-          </button>
-        </div>
-      </div>
-
-      {/* =========================================================
-          OWNER LIST
-      ========================================================= */}
-      <div className="grid gap-6">
-        {filteredOwners.map((owner) => (
-          <div
-            key={owner.id}
-            className="
-              rounded-[30px]
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-7
-
-              shadow-sm
-
-              transition-all
-              duration-300
-
-              hover:-translate-y-1
-              hover:border-cyan-500/30
-            "
-          >
-            <div
-              className="
-                flex
-                flex-col
-                gap-8
-
-                xl:flex-row
-                xl:items-center
-                xl:justify-between
-              "
-            >
-              {/* LEFT */}
-              <div className="flex gap-5">
-                {/* AVATAR */}
-                <div
-                  className="
-                    flex
-                    h-20
-                    w-20
-                    items-center
-                    justify-center
-
-                    rounded-3xl
-
-                    bg-cyan-500/10
-                  "
-                >
-                  <User2
-                    size={34}
-                    className="text-cyan-500"
-                  />
-                </div>
-
-                {/* INFO */}
-                <div>
-                  <h2
-                    className="
-                      text-2xl
-                      font-black
-                    "
-                  >
-                    {owner.name}
-                  </h2>
-
-                  <p
-                    className="
-                      mt-2
-
-                      text-sm
-                      text-gray-500
-                      dark:text-gray-400
-                    "
-                  >
-                    Owner Venue
-                  </p>
-
-                  {/* BADGES */}
-                  <div
-                    className="
-                      mt-5
-
-                      flex
-                      flex-wrap
-                      gap-3
-                    "
-                  >
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        bg-gray-100
-                        dark:bg-white/5
-
-                        px-4
-                        py-2
-
-                        text-sm
-                      "
-                    >
-                      <Mail size={16} />
-                      {owner.email}
-                    </div>
-
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        bg-gray-100
-                        dark:bg-white/5
-
-                        px-4
-                        py-2
-
-                        text-sm
-                      "
-                    >
-                      <Phone size={16} />
-                      {owner.phone}
-                    </div>
-
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        bg-gray-100
-                        dark:bg-white/5
-
-                        px-4
-                        py-2
-
-                        text-sm
-                      "
-                    >
-                      <MapPin size={16} />
-                      {owner.city || "-"}
-                    </div>
-                  </div>
-
-                  {/* VENUE */}
-                  <div
-                    className="
-                      mt-5
-
-                      flex
-                      flex-wrap
-                      gap-3
-                    "
-                  >
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        bg-cyan-500/10
-
-                        px-4
-                        py-2
-
-                        text-sm
-                        font-semibold
-                        text-cyan-500
-                      "
-                    >
-                      <Store size={16} />
-                      Owner Lapangan
-                    </div>
-
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        bg-purple-500/10
-
-                        px-4
-                        py-2
-
-                        text-sm
-                        font-semibold
-                        text-purple-500
-                      "
-                    >
-                      <Trophy size={16} />
-                      Owner Terdaftar
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT */}
-              <div
-                className="
-                  flex
-                  flex-col
-                  items-start
-                  gap-5
-
-                  xl:items-end
-                "
-              >
-                {/* STATUS */}
-                {owner.status === "active" && (
-                  <div
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-full
-
-                      bg-green-500/10
-
-                      px-5
-                      py-2
-
-                      text-sm
-                      font-semibold
-                      text-green-500
-                    "
-                  >
-                    <CheckCircle2 size={16} />
-                    Aktif
-                  </div>
-                )}
-
-                {owner.status === "pending" && (
-                  <div
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-full
-
-                      bg-yellow-500/10
-
-                      px-5
-                      py-2
-
-                      text-sm
-                      font-semibold
-                      text-yellow-500
-                    "
-                  >
-                    <ShieldCheck size={16} />
-                    Pending
-                  </div>
-                )}
-
-                {owner.status === "blocked" && (
-                  <div
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-full
-
-                      bg-red-500/10
-
-                      px-5
-                      py-2
-
-                      text-sm
-                      font-semibold
-                      text-red-500
-                    "
-                  >
-                    <XCircle size={16} />
-                    Diblokir
-                  </div>
-                )}
-
-                {/* ACTIONS */}
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-2xl
-
-                      border
-                      border-gray-300
-                      dark:border-white/10
-
-                      px-5
-                      py-3
-
-                      text-sm
-                      font-medium
-
-                      transition-all
-                      duration-300
-
-                      hover:border-cyan-500
-                      hover:text-cyan-500
-                    "
-                  >
-                    <Eye size={16} />
-                    Detail
-                  </button>
-
-                  <button
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-2xl
-
-                      bg-cyan-500
-
-                      px-5
-                      py-3
-
-                      text-sm
-                      font-semibold
-                      text-white
-
-                      transition-all
-                      duration-300
-
-                      hover:bg-cyan-400
-                    "
-                  >
-                    <Building2 size={16} />
-                    Kelola
-                  </button>
-
-                  <button
-                    className="
-                      flex
-                      h-[50px]
-                      w-[50px]
-                      items-center
-                      justify-center
-
-                      rounded-2xl
-
-                      border
-                      border-gray-300
-                      dark:border-white/10
-
-                      transition-all
-                      duration-300
-
-                      hover:border-cyan-500
-                    "
-                  >
-                    <MoreHorizontal size={18} />
-                  </button>
-                </div>
-              </div>
+      <OwnerStatsSection stats={stats} />
+
+      {stats.pendingReview > 0 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-500/30 dark:bg-violet-500/10 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-violet-600 p-2 text-white">
+              <ShieldAlert size={18} />
+            </div>
+            <div>
+              <p className="font-semibold text-violet-900 dark:text-violet-100">
+                {stats.pendingReview} pendaftaran owner menunggu verifikasi
+              </p>
+              <p className="mt-1 text-sm text-violet-700 dark:text-violet-300">
+                Data dari form &quot;Daftar Owner&quot; di website masuk ke halaman ini.
+                Buka Detail → klik <strong>Setujui Owner</strong> (verifikasi + aktifkan
+                akun sekaligus).
+              </p>
             </div>
           </div>
-        ))}
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              setActivity("menunggu_verifikasi");
+              setStatus("pending");
+            }}
+            className="shrink-0 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-500"
+          >
+            Lihat Pendaftaran Baru
+          </button>
+        </div>
+      )}
+
+      <OwnerFilters
+        search={search}
+        setSearch={setSearch}
+        status={status}
+        setStatus={setStatus}
+        activity={activity}
+        setActivity={setActivity}
+        totalCount={filteredOwners.length}
+      />
+
+      <OwnersTable
+        owners={filteredOwners}
+        emptyMessage={
+          search || status !== "all" || activity !== "all"
+            ? "Tidak ada owner yang cocok dengan filter"
+            : "Belum ada data owner"
+        }
+        onDetail={openDetail}
+        onEdit={openEdit}
+        onDelete={openDelete}
+      />
+
+      <OwnerModal
+        open={modalMode !== null}
+        mode={modalMode === "create" ? "create" : "edit"}
+        onClose={() => setModalMode(null)}
+        onSubmit={handleSubmit}
+        initialData={selectedOwner}
+      />
+
+      <OwnerDetailModal
+        open={detailOpen}
+        owner={currentOwner}
+        reviewLoading={actionLoading}
+        onClose={() => setDetailOpen(false)}
+        onEdit={openEdit}
+        onAddLapangan={openAddLapangan}
+        onApprove={handleApprove}
+        onReject={handleReject}
+      />
+
+      <AddOwnerLapanganModal
+        open={lapanganOpen}
+        owner={currentOwner}
+        onClose={() => setLapanganOpen(false)}
+        onSuccess={async () => {
+          await reload();
+          showToast("success", "Lapangan berhasil ditambahkan");
+        }}
+      />
+
+      <DeleteOwnerDialog
+        open={deleteOpen}
+        owner={selectedOwner}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+      />
     </div>
+  );
+}
+
+export default function AdminOwnersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[400px] items-center justify-center text-sm text-gray-500">
+          Memuat...
+        </div>
+      }
+    >
+      <AdminOwnersContent />
+    </Suspense>
   );
 }

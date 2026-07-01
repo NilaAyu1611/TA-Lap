@@ -1,884 +1,228 @@
-/* =========================================================
-   FILE:
-   app/admin/settings/page.tsx
-   ========================================================= */
-
 "use client";
 
 import {
-  Bell,
-  Database,
-  Globe,
-  KeyRound,
-  Lock,
-  Moon,
-  Palette,
+  AlertCircle,
+  Loader2,
+  RefreshCw,
   Save,
-  ShieldCheck,
-  UserCog,
+  Settings2,
 } from "lucide-react";
-
 import { useState } from "react";
 
+import SettingsAppearanceSection from "@/components/admin/settings/SettingsAppearanceSection";
+import SettingsBackupSection from "@/components/admin/settings/SettingsBackupSection";
+import SettingsBusinessSection from "@/components/admin/settings/SettingsBusinessSection";
+import SettingsGeneralSection from "@/components/admin/settings/SettingsGeneralSection";
+import SettingsNotificationsSection from "@/components/admin/settings/SettingsNotificationsSection";
+import SettingsProfileCard from "@/components/admin/settings/SettingsProfileCard";
+import SettingsSecuritySection from "@/components/admin/settings/SettingsSecuritySection";
+import { getApiErrorMessage } from "@/hooks/usePesananFormOptions";
+import { useSettings } from "@/hooks/useSettings";
+import { formatDate, formatTime } from "@/lib/auth";
+
 export default function AdminSettingsPage() {
-  const [darkMode, setDarkMode] = useState(true);
+  const {
+    data,
+    form,
+    loading,
+    refreshing,
+    saving,
+    backingUp,
+    error,
+    reload,
+    updateForm,
+    saveSettings,
+    saveProfile,
+    savePassword,
+    runBackup,
+  } = useSettings();
+
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      const message = await saveSettings();
+      showToast("success", message || "Pengaturan berhasil disimpan");
+    } catch (err) {
+      showToast("error", getApiErrorMessage(err));
+    }
+  };
+
+  const handleSaveProfile = async (
+    profileForm: Parameters<typeof saveProfile>[0]
+  ) => {
+    try {
+      const message = await saveProfile(profileForm);
+      showToast("success", message || "Profil berhasil diperbarui");
+      return message;
+    } catch (err) {
+      showToast("error", getApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  const handleChangePassword = async (
+    passwordForm: Parameters<typeof savePassword>[0]
+  ) => {
+    try {
+      const message = await savePassword(passwordForm);
+      showToast("success", message || "Password berhasil diubah");
+      return message;
+    } catch (err) {
+      showToast("error", getApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  const handleBackup = async () => {
+    try {
+      const message = await runBackup();
+      showToast("success", message || "Backup berhasil dibuat");
+      return message;
+    } catch (err) {
+      showToast("error", getApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2 className="animate-spin" size={20} />
+          <span>Memuat pengaturan sistem...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data || !form) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 px-4 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10">
+          <AlertCircle className="text-red-600 dark:text-red-400" size={24} />
+        </div>
+        <div>
+          <p className="font-semibold">Gagal memuat pengaturan</p>
+          <p className="mt-1 text-sm text-gray-500">{error}</p>
+        </div>
+        <button
+          onClick={reload}
+          className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-gray-900"
+        >
+          <RefreshCw size={16} />
+          Coba Lagi
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      {/* PAGE HEADER */}
-      <div>
-        <p className="text-sm font-medium text-cyan-500">
-          ADMIN SETTINGS
-        </p>
-
-        <h1
-          className="
-            mt-2
-            text-4xl
-            font-black
-            tracking-tight
-          "
+    <div className="space-y-6">
+      {toast && (
+        <div
+          className={`fixed right-6 top-24 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
         >
-          Pengaturan Sistem
-        </h1>
-
-        <p
-          className="
-            mt-3
-            max-w-3xl
-            text-gray-500
-            dark:text-gray-400
-          "
-        >
-          Kelola konfigurasi aplikasi, keamanan sistem,
-          notifikasi, dan pengaturan panel admin TA-LAP.
-        </p>
-      </div>
-
-      {/* GRID */}
-      <div
-        className="
-          grid
-          gap-6
-
-          xl:grid-cols-3
-        "
-      >
-        {/* LEFT */}
-        <div className="space-y-6 xl:col-span-2">
-          {/* GENERAL */}
-          <div
-            className="
-              rounded-3xl
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="
-                  flex
-                  h-12
-                  w-12
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  bg-cyan-500/10
-                "
-              >
-                <Globe className="text-cyan-500" />
-              </div>
-
-              <div>
-                <h2 className="text-xl font-bold">
-                  Pengaturan Umum
-                </h2>
-
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                    dark:text-gray-400
-                  "
-                >
-                  Konfigurasi identitas platform.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 grid gap-5 md:grid-cols-2">
-              {/* INPUT */}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Nama Platform
-                </label>
-
-                <input
-                  type="text"
-                  defaultValue="TA-LAP"
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    border-gray-200
-                    dark:border-white/10
-
-                    bg-gray-50
-                    dark:bg-white/5
-
-                    px-4
-                    py-3
-
-                    outline-none
-                  "
-                />
-              </div>
-
-              {/* INPUT */}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Email Sistem
-                </label>
-
-                <input
-                  type="email"
-                  defaultValue="admin@talap.com"
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    border-gray-200
-                    dark:border-white/10
-
-                    bg-gray-50
-                    dark:bg-white/5
-
-                    px-4
-                    py-3
-
-                    outline-none
-                  "
-                />
-              </div>
-
-              {/* INPUT */}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Nomor Admin
-                </label>
-
-                <input
-                  type="text"
-                  defaultValue="+62 812-3456-7890"
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    border-gray-200
-                    dark:border-white/10
-
-                    bg-gray-50
-                    dark:bg-white/5
-
-                    px-4
-                    py-3
-
-                    outline-none
-                  "
-                />
-              </div>
-
-              {/* INPUT */}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Zona Waktu
-                </label>
-
-                <select
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    border-gray-200
-                    dark:border-white/10
-
-                    bg-gray-50
-                    dark:bg-white/5
-
-                    px-4
-                    py-3
-
-                    outline-none
-                  "
-                >
-                  <option>Asia/Jakarta</option>
-                  <option>Asia/Makassar</option>
-                  <option>Asia/Jayapura</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* SECURITY */}
-          <div
-            className="
-              rounded-3xl
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="
-                  flex
-                  h-12
-                  w-12
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  bg-red-500/10
-                "
-              >
-                <ShieldCheck className="text-red-500" />
-              </div>
-
-              <div>
-                <h2 className="text-xl font-bold">
-                  Keamanan Sistem
-                </h2>
-
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                    dark:text-gray-400
-                  "
-                >
-                  Pengaturan keamanan akun admin.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-5">
-              {/* PASSWORD */}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Password Baru
-                </label>
-
-                <div className="relative">
-                  <Lock
-                    size={18}
-                    className="
-                      absolute
-                      left-4
-                      top-1/2
-                      -translate-y-1/2
-                      text-gray-400
-                    "
-                  />
-
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="
-                      w-full
-
-                      rounded-2xl
-
-                      border
-                      border-gray-200
-                      dark:border-white/10
-
-                      bg-gray-50
-                      dark:bg-white/5
-
-                      py-3
-                      pl-12
-                      pr-4
-
-                      outline-none
-                    "
-                  />
-                </div>
-              </div>
-
-              {/* API KEY */}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  API Secret Key
-                </label>
-
-                <div className="relative">
-                  <KeyRound
-                    size={18}
-                    className="
-                      absolute
-                      left-4
-                      top-1/2
-                      -translate-y-1/2
-                      text-gray-400
-                    "
-                  />
-
-                  <input
-                    type="text"
-                    defaultValue="sk_live_xxxxxxxxx"
-                    className="
-                      w-full
-
-                      rounded-2xl
-
-                      border
-                      border-gray-200
-                      dark:border-white/10
-
-                      bg-gray-50
-                      dark:bg-white/5
-
-                      py-3
-                      pl-12
-                      pr-4
-
-                      outline-none
-                    "
-                  />
-                </div>
-              </div>
-
-              {/* SWITCHES */}
-              <div className="space-y-4">
-                {/* 2FA */}
-                <div
-                  className="
-                    flex
-                    items-center
-                    justify-between
-
-                    rounded-2xl
-
-                    border
-                    border-gray-200
-                    dark:border-white/10
-
-                    p-4
-                  "
-                >
-                  <div>
-                    <h4 className="font-semibold">
-                      Two Factor Authentication
-                    </h4>
-
-                    <p
-                      className="
-                        text-sm
-                        text-gray-500
-                        dark:text-gray-400
-                      "
-                    >
-                      Aktifkan verifikasi 2 langkah.
-                    </p>
-                  </div>
-
-                  <button
-                    className="
-                      rounded-full
-                      bg-green-500
-
-                      px-4
-                      py-2
-
-                      text-sm
-                      font-semibold
-                      text-white
-                    "
-                  >
-                    Aktif
-                  </button>
-                </div>
-
-                {/* LOGIN ALERT */}
-                <div
-                  className="
-                    flex
-                    items-center
-                    justify-between
-
-                    rounded-2xl
-
-                    border
-                    border-gray-200
-                    dark:border-white/10
-
-                    p-4
-                  "
-                >
-                  <div>
-                    <h4 className="font-semibold">
-                      Login Notification
-                    </h4>
-
-                    <p
-                      className="
-                        text-sm
-                        text-gray-500
-                        dark:text-gray-400
-                      "
-                    >
-                      Kirim notifikasi login admin.
-                    </p>
-                  </div>
-
-                  <button
-                    className="
-                      rounded-full
-                      bg-cyan-500
-
-                      px-4
-                      py-2
-
-                      text-sm
-                      font-semibold
-                      text-white
-                    "
-                  >
-                    Enabled
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* APPEARANCE */}
-          <div
-            className="
-              rounded-3xl
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="
-                  flex
-                  h-12
-                  w-12
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  bg-purple-500/10
-                "
-              >
-                <Palette className="text-purple-500" />
-              </div>
-
-              <div>
-                <h2 className="text-xl font-bold">
-                  Tampilan Dashboard
-                </h2>
-
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                    dark:text-gray-400
-                  "
-                >
-                  Kustomisasi tampilan panel admin.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-5">
-              {/* DARK MODE */}
-              <div
-                className="
-                  flex
-                  items-center
-                  justify-between
-
-                  rounded-2xl
-
-                  border
-                  border-gray-200
-                  dark:border-white/10
-
-                  p-4
-                "
-              >
-                <div className="flex items-center gap-3">
-                  <Moon className="text-cyan-500" />
-
-                  <div>
-                    <h4 className="font-semibold">
-                      Dark Mode
-                    </h4>
-
-                    <p
-                      className="
-                        text-sm
-                        text-gray-500
-                        dark:text-gray-400
-                      "
-                    >
-                      Aktifkan tema gelap dashboard.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setDarkMode(!darkMode)}
-                  className={`
-                    relative
-                    h-7
-                    w-14
-                    rounded-full
-                    transition-all
-
-                    ${
-                      darkMode
-                        ? "bg-cyan-500"
-                        : "bg-gray-300"
-                    }
-                  `}
-                >
-                  <span
-                    className={`
-                      absolute
-                      top-1
-
-                      h-5
-                      w-5
-
-                      rounded-full
-                      bg-white
-
-                      transition-all
-
-                      ${
-                        darkMode
-                          ? "right-1"
-                          : "left-1"
-                      }
-                    `}
-                  />
-                </button>
-              </div>
-
-              {/* LANGUAGE */}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Bahasa Sistem
-                </label>
-
-                <select
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    border-gray-200
-                    dark:border-white/10
-
-                    bg-gray-50
-                    dark:bg-white/5
-
-                    px-4
-                    py-3
-
-                    outline-none
-                  "
-                >
-                  <option>Indonesia</option>
-                  <option>English</option>
-                </select>
-              </div>
-            </div>
-          </div>
+          {toast.message}
         </div>
+      )}
 
-        {/* RIGHT */}
-        <div className="space-y-6">
-          {/* PROFILE */}
-          <div
-            className="
-              rounded-3xl
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
-          >
-            <div className="flex items-center gap-4">
-              <div
-                className="
-                  flex
-                  h-16
-                  w-16
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  bg-cyan-500/10
-                "
-              >
-                <UserCog
-                  size={30}
-                  className="text-cyan-500"
-                />
-              </div>
-
-              <div>
-                <h3 className="text-xl font-bold">
-                  Super Admin
-                </h3>
-
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                    dark:text-gray-400
-                  "
-                >
-                  admin@talap.com
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <div
-                className="
-                  flex
-                  items-center
-                  justify-between
-                "
-              >
-                <span className="text-sm text-gray-500">
-                  Role
-                </span>
-
-                <span
-                  className="
-                    rounded-full
-                    bg-cyan-500/10
-
-                    px-3
-                    py-1
-
-                    text-sm
-                    font-semibold
-                    text-cyan-500
-                  "
-                >
-                  Super Admin
-                </span>
-              </div>
-
-              <div
-                className="
-                  flex
-                  items-center
-                  justify-between
-                "
-              >
-                <span className="text-sm text-gray-500">
-                  Last Login
-                </span>
-
-                <span className="font-medium">
-                  10 Menit Lalu
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* NOTIFICATIONS */}
-          <div
-            className="
-              rounded-3xl
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
-          >
-            <div className="flex items-center gap-3">
-              <Bell className="text-yellow-500" />
-
-              <h3 className="text-lg font-bold">
-                Notifikasi Sistem
-              </h3>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              {[
-                "Booking baru masuk",
-                "Owner baru mendaftar",
-                "Pembayaran berhasil",
-                "Backup database selesai",
-              ].map((item, index) => (
-                <div
-                  key={index}
-                  className="
-                    rounded-2xl
-
-                    border
-                    border-gray-200
-                    dark:border-white/10
-
-                    p-4
-                  "
-                >
-                  <p className="text-sm">{item}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* DATABASE */}
-          <div
-            className="
-              rounded-3xl
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-            "
-          >
-            <div className="flex items-center gap-3">
-              <Database className="text-green-500" />
-
-              <h3 className="text-lg font-bold">
-                Database Backup
-              </h3>
-            </div>
-
-            <p
-              className="
-                mt-4
-                text-sm
-                leading-7
-
-                text-gray-500
-                dark:text-gray-400
-              "
-            >
-              Backup terakhir berhasil dilakukan
-              pada 20 Mei 2026 pukul 02:00 WIB.
+      <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-cyan-50 via-white to-white p-6 shadow-sm dark:border-white/10 dark:from-cyan-950/20 dark:via-gray-900/50 dark:to-gray-900/50">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+              <Settings2 size={14} />
+              Admin Settings
             </p>
-
-            <button
-              className="
-                mt-6
-
-                flex
-                w-full
-                items-center
-                justify-center
-                gap-2
-
-                rounded-2xl
-
-                bg-green-500
-
-                px-5
-                py-3
-
-                text-sm
-                font-semibold
-                text-white
-
-                transition
-                hover:bg-green-400
-              "
-            >
-              <Database size={18} />
-              Backup Sekarang
-            </button>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              Pengaturan Sistem
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+              Kelola konfigurasi platform, komisi bisnis, keamanan admin,
+              notifikasi, dan backup data. Semua data live dari database.
+            </p>
+            <p className="mt-2 inline-flex items-center gap-2 text-xs text-gray-500">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${
+                  refreshing ? "animate-pulse bg-cyan-400" : "bg-emerald-500"
+                }`}
+              />
+              {refreshing ? "Memperbarui..." : "Live"}
+              {data.fetchedAt && (
+                <>
+                  {" · "}
+                  Diperbarui {formatDate(data.fetchedAt)},{" "}
+                  {formatTime(data.fetchedAt)}
+                </>
+              )}
+            </p>
           </div>
+          <button
+            onClick={reload}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:border-cyan-200 dark:border-white/10 dark:bg-white/5"
+          >
+            <RefreshCw size={16} />
+            Refresh
+          </button>
         </div>
       </div>
 
-      {/* SAVE BUTTON */}
-      <div className="flex justify-end">
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="space-y-6 xl:col-span-2">
+          <SettingsGeneralSection form={form} onChange={updateForm} />
+          <SettingsBusinessSection form={form} onChange={updateForm} />
+          <SettingsSecuritySection
+            form={form}
+            onChange={updateForm}
+            onChangePassword={handleChangePassword}
+            saving={saving}
+          />
+          <SettingsAppearanceSection form={form} onChange={updateForm} />
+        </div>
+
+        <div className="space-y-6">
+          <SettingsProfileCard
+            profile={data.profile}
+            sessionStartedAt={data.sessionStartedAt}
+            currentIp={data.currentIp}
+            lastLogin={data.lastLogin}
+            previousLogin={data.previousLogin}
+            onSaveProfile={handleSaveProfile}
+            saving={saving}
+          />
+          <SettingsNotificationsSection form={form} onChange={updateForm} />
+          <SettingsBackupSection
+            backups={data.backups}
+            onBackup={handleBackup}
+            backingUp={backingUp}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end border-t border-gray-200 pt-4 dark:border-white/10">
         <button
-          className="
-            flex
-            items-center
-            gap-2
-
-            rounded-2xl
-
-            bg-cyan-500
-
-            px-6
-            py-3
-
-            text-sm
-            font-semibold
-            text-white
-
-            transition-all
-            duration-300
-
-            hover:scale-105
-            hover:bg-cyan-400
-          "
+          onClick={handleSaveSettings}
+          disabled={saving}
+          className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-60"
         >
-          <Save size={18} />
-          Simpan Pengaturan
+          {saving ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Save size={16} />
+          )}
+          Simpan Pengaturan Platform
         </button>
       </div>
     </div>

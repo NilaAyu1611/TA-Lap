@@ -1,510 +1,124 @@
-// import {
-//   Building2,
-//   CreditCard,
-//   TrendingUp,
-//   Users,
-// } from "lucide-react";
-
-// export default function AdminDashboardPage() {
-//   return (
-//     <div>
-//       <div
-//         className="
-//           rounded-[32px]
-
-//           border
-//           border-gray-200
-//           dark:border-white/10
-
-//           bg-white
-//           dark:bg-white/5
-
-//           p-8
-//         "
-//       >
-//         <p className="font-semibold text-cyan-500">
-//           ADMIN DASHBOARD
-//         </p>
-
-//         <h1
-//           className="
-//             mt-4
-
-//             text-5xl
-//             font-black
-//             tracking-tight
-//           "
-//         >
-//           System Monitoring Center
-//         </h1>
-
-//         <p
-//           className="
-//             mt-5
-//             max-w-3xl
-
-//             leading-8
-
-//             text-gray-600
-//             dark:text-gray-300
-//           "
-//         >
-//           Kelola seluruh user, owner, transaksi,
-//           dan lapangan melalui panel admin.
-//         </p>
-//       </div>
-
-//       {/* STATS */}
-//       <div
-//         className="
-//           mt-10
-
-//           grid
-//           gap-6
-
-//           md:grid-cols-2
-//           xl:grid-cols-4
-//         "
-//       >
-//         {[
-//           {
-//             title: "Total Users",
-//             value: "2.421",
-//             icon: <Users className="text-cyan-500" />,
-//           },
-
-//           {
-//             title: "Total Owners",
-//             value: "85",
-//             icon: <Building2 className="text-purple-500" />,
-//           },
-
-//           {
-//             title: "Total Transaksi",
-//             value: "Rp 152jt",
-//             icon: <CreditCard className="text-pink-500" />,
-//           },
-
-//           {
-//             title: "Growth",
-//             value: "+18%",
-//             icon: <TrendingUp className="text-green-500" />,
-//           },
-//         ].map((item, index) => (
-//           <div
-//             key={index}
-//             className="
-//               rounded-3xl
-
-//               border
-//               border-gray-200
-//               dark:border-white/10
-
-//               bg-white
-//               dark:bg-white/5
-
-//               p-6
-//             "
-//           >
-//             <div className="flex items-center justify-between">
-//               <div>
-//                 <p className="text-sm text-gray-500">
-//                   {item.title}
-//                 </p>
-
-//                 <h3
-//                   className="
-//                     mt-3
-
-//                     text-3xl
-//                     font-black
-//                   "
-//                 >
-//                   {item.value}
-//                 </h3>
-//               </div>
-
-//               <div
-//                 className="
-//                   flex
-//                   h-14
-//                   w-14
-//                   items-center
-//                   justify-center
-
-//                   rounded-2xl
-
-//                   bg-gray-100
-//                   dark:bg-white/10
-//                 "
-//               >
-//                 {item.icon}
-//               </div>
-//             </div>
-//           </div>
-//         ))}
-//       </div>
-//     </div>
-//   );
-// }
-
-
-// import {
-//   CreditCard,
-//   Store,
-//   Users,
-//   Wallet,
-// } from "lucide-react";
-
-// export default function AdminDashboardPage() {
-//   return (
-//     <div>
-//       {/* HERO */}
-//       <div
-//         className="
-//           rounded-[32px]
-
-//           border
-//           border-gray-200
-//           dark:border-white/10
-
-//           bg-white
-//           dark:bg-white/5
-
-//           p-8
-//         "
-//       >
-//         <p
-//           className="
-//             text-sm
-//             font-semibold
-//             text-cyan-500
-//           "
-//         >
-//           ADMIN DASHBOARD
-//         </p>
-
-//         <h1
-//           className="
-//             mt-4
-//             text-4xl
-//             font-black
-//           "
-//         >
-//           Management Overview
-//         </h1>
-
-//         <p
-//           className="
-//             mt-4
-//             max-w-3xl
-
-//             text-gray-600
-//             dark:text-gray-300
-//           "
-//         >
-//           Kelola seluruh user, owner, transaksi,
-//           pembayaran, dan monitoring sistem.
-//         </p>
-//       </div>
-
-//       {/* STATS */}
-//       <div
-//         className="
-//           mt-8
-
-//           grid
-//           gap-6
-
-//           md:grid-cols-2
-//           xl:grid-cols-4
-//         "
-//       >
-//         {[
-//           {
-//             title: "Total Users",
-//             value: "1,240",
-//             icon: <Users className="text-cyan-500" />,
-//           },
-//           {
-//             title: "Total Owners",
-//             value: "120",
-//             icon: <Store className="text-purple-500" />,
-//           },
-//           {
-//             title: "Transactions",
-//             value: "8,420",
-//             icon: <CreditCard className="text-pink-500" />,
-//           },
-//           {
-//             title: "Revenue",
-//             value: "Rp 125jt",
-//             icon: <Wallet className="text-green-500" />,
-//           },
-//         ].map((item, index) => (
-//           <div
-//             key={index}
-//             className="
-//               rounded-3xl
-
-//               border
-//               border-gray-200
-//               dark:border-white/10
-
-//               bg-white
-//               dark:bg-white/5
-
-//               p-6
-//             "
-//           >
-//             <div className="flex items-center justify-between">
-//               <div>
-//                 <p
-//                   className="
-//                     text-sm
-//                     text-gray-500
-//                   "
-//                 >
-//                   {item.title}
-//                 </p>
-
-//                 <h3
-//                   className="
-//                     mt-3
-//                     text-3xl
-//                     font-black
-//                   "
-//                 >
-//                   {item.value}
-//                 </h3>
-//               </div>
-
-//               <div
-//                 className="
-//                   flex
-//                   h-14
-//                   w-14
-//                   items-center
-//                   justify-center
-
-//                   rounded-2xl
-
-//                   bg-gray-100
-//                   dark:bg-white/5
-//                 "
-//               >
-//                 {item.icon}
-//               </div>
-//             </div>
-//           </div>
-//         ))}
-//       </div>
-//     </div>
-//   );
-// }
-
-
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { LayoutDashboard, Loader2, RefreshCw } from "lucide-react";
 
+import AdminDashboardAlerts from "@/components/admin/dashboard/AdminDashboardAlerts";
 import {
-  CreditCard,
-  Store,
-  Users,
-  Wallet,
-} from "lucide-react";
-
-import { getAdminDashboard } from "@/services/dashboard.service";
+  AdminBookingStatusChart,
+  AdminPaymentMethodChart,
+  AdminVolumeChart,
+} from "@/components/admin/dashboard/AdminDashboardCharts";
+import AdminDashboardStatsSection from "@/components/admin/dashboard/AdminDashboardStats";
+import AdminQuickActions from "@/components/admin/dashboard/AdminQuickActions";
+import { useAdminDashboard } from "@/hooks/useAdminDashboard";
+import { formatDate } from "@/lib/auth";
 
 export default function AdminDashboardPage() {
-  const [loading, setLoading] =
-    useState(true);
-
-  const [dashboard, setDashboard] =
-    useState({
-      totalUsers: 0,
-      totalOwners: 0,
-      totalBooking: 0,
-      totalLapangan: 0,
-      totalPemasukan: 0,
-    });
-
-  useEffect(() => {
-    loadDashboard();
-  }, []);
-
-  const loadDashboard = async () => {
-    try {
-      const data =
-        await getAdminDashboard();
-
-      setDashboard(data);
-    } catch (error) {
-      console.error(
-        "Gagal load dashboard",
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, loading, error, reload } = useAdminDashboard();
 
   if (loading) {
     return (
-      <div className="p-8">
-        Loading Dashboard...
+      <div className="flex min-h-[420px] items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2 className="animate-spin" size={20} />
+          Memuat dashboard...
+        </div>
       </div>
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex min-h-[420px] flex-col items-center justify-center gap-4">
+        <p className="text-sm text-red-500">{error}</p>
+        <button
+          type="button"
+          onClick={reload}
+          className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white"
+        >
+          Coba Lagi
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
   return (
-    <div>
-      {/* HERO */}
-      <div
-        className="
-          rounded-[32px]
-          border
-          border-gray-200
-          dark:border-white/10
-          bg-white
-          dark:bg-white/5
-          p-8
-        "
-      >
-        <p
-          className="
-            text-sm
-            font-semibold
-            text-cyan-500
-          "
-        >
-          ADMIN DASHBOARD
-        </p>
-
-        <h1
-          className="
-            mt-4
-            text-4xl
-            font-black
-          "
-        >
-          Management Overview
-        </h1>
-
-        <p
-          className="
-            mt-4
-            max-w-3xl
-            text-gray-600
-            dark:text-gray-300
-          "
-        >
-          Kelola seluruh user, owner,
-          transaksi, pembayaran,
-          dan monitoring sistem.
-        </p>
+    <div className="mx-auto max-w-[1600px] space-y-5">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-r from-cyan-50 via-white to-violet-50/40 p-5 shadow-md shadow-slate-200/50 dark:border-white/10 dark:from-cyan-950/25 dark:via-gray-900/50 dark:to-violet-950/15 dark:shadow-none md:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+              <LayoutDashboard size={14} />
+              Dashboard Admin
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
+              Ringkasan Platform
+            </h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Diperbarui {formatDate(data.generatedAt)}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin/laporan"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold shadow-sm dark:border-white/10 dark:bg-white/5"
+            >
+              Laporan
+            </Link>
+            <Link
+              href="/admin/transaksi"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold shadow-sm dark:border-white/10 dark:bg-white/5"
+            >
+              Transaksi
+            </Link>
+            <button
+              type="button"
+              onClick={reload}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm dark:border-white/10 dark:bg-white/5"
+            >
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* STATS */}
-      <div
-        className="
-          mt-8
-          grid
-          gap-6
-          md:grid-cols-2
-          xl:grid-cols-4
-        "
-      >
-        {[
-          {
-            title: "Total Users",
-            value:
-              dashboard.totalUsers,
-            icon: (
-              <Users className="text-cyan-500" />
-            ),
-          },
+      <AdminDashboardAlerts stats={data.stats} />
 
-          {
-            title: "Total Owners",
-            value:
-              dashboard.totalOwners,
-            icon: (
-              <Store className="text-purple-500" />
-            ),
-          },
+      <AdminDashboardStatsSection stats={data.stats} />
 
-          {
-            title: "Total Booking",
-            value:
-              dashboard.totalBooking,
-            icon: (
-              <CreditCard className="text-pink-500" />
-            ),
-          },
-
-          {
-            title: "Total Revenue",
-            value: `Rp ${dashboard.totalPemasukan.toLocaleString(
-              "id-ID"
-            )}`,
-            icon: (
-              <Wallet className="text-green-500" />
-            ),
-          },
-        ].map((item, index) => (
-          <div
-            key={index}
-            className="
-              rounded-3xl
-              border
-              border-gray-200
-              dark:border-white/10
-              bg-white
-              dark:bg-white/5
-              p-6
-            "
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p
-                  className="
-                    text-sm
-                    text-gray-500
-                  "
-                >
-                  {item.title}
-                </p>
-
-                <h3
-                  className="
-                    mt-3
-                    text-3xl
-                    font-black
-                  "
-                >
-                  {item.value}
-                </h3>
-              </div>
-
-              <div
-                className="
-                  flex
-                  h-14
-                  w-14
-                  items-center
-                  justify-center
-                  rounded-2xl
-                  bg-gray-100
-                  dark:bg-white/5
-                "
-              >
-                {item.icon}
-              </div>
-            </div>
+      <div className="grid gap-5 xl:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none xl:col-span-2">
+          <h3 className="text-base font-semibold">Tren Transaksi & Komisi</h3>
+          <p className="mt-0.5 text-xs text-gray-500">6 bulan terakhir</p>
+          <div className="mt-4">
+            <AdminVolumeChart data={data.charts.bulanan} />
           </div>
-        ))}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none">
+          <h3 className="mb-3 text-base font-semibold">Aksi Cepat</h3>
+          <AdminQuickActions />
+        </div>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none">
+          <h3 className="text-base font-semibold">Status Pesanan</h3>
+          <div className="mt-4">
+            <AdminBookingStatusChart data={data.charts.bookingStatus} />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/40 dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none">
+          <h3 className="text-base font-semibold">Metode Pembayaran</h3>
+          <div className="mt-4">
+            <AdminPaymentMethodChart data={data.charts.perMetode} />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -22,6 +22,23 @@ export const getStoredUser = (): AuthUser | null => {
   }
 };
 
+/** Ambil token dari localStorage, fallback ke cookie (sinkron dengan middleware). */
+export const getAuthToken = (): string | null => {
+  if (typeof window === "undefined") return null;
+
+  const fromStorage = localStorage.getItem("token");
+  if (fromStorage) return fromStorage;
+
+  const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+  const fromCookie = match ? decodeURIComponent(match[1]) : null;
+  if (fromCookie) {
+    localStorage.setItem("token", fromCookie);
+    return fromCookie;
+  }
+
+  return null;
+};
+
 export const storeUser = (user: AuthUser) => {
   const { password: _, ...safe } = user as AuthUser & { password?: string };
   localStorage.setItem("user", JSON.stringify(safe));
@@ -63,7 +80,8 @@ export const formatDate = (date: string | Date) => {
   });
 };
 
-export const formatTime = (date: string | Date) => {
+export const formatTime = (date: string | Date | null | undefined) => {
+  if (date == null || date === "") return "—";
   return new Date(date).toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",

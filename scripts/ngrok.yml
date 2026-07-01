@@ -1,0 +1,10 @@
+version: "2"
+tunnels:
+  talap-fe:
+    addr: 3000
+    proto: http
+    schemes:
+      - https
+    # Domain TETAP (gratis): salin dari dashboard.ngrok.com → Domains
+    # Hapus tanda # di baris domain, lalu ganti dengan dev domain Anda:
+    # domain: abc123xyz.ngrok-free.dev

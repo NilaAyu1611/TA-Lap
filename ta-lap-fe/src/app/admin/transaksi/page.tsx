@@ -1,954 +1,279 @@
-/* =========================================================
-   FILE:
-   app/admin/transaksi/page.tsx
-   ========================================================= */
-
 "use client";
 
+import { Loader2, RefreshCw } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+
+import TransaksiDetailModal from "@/components/admin/transaksi/TransaksiDetailModal";
+import SetoranKomisiTunaiPanel from "@/components/admin/transaksi/SetoranKomisiTunaiPanel";
+import AdminSetoranPengajuanPanel from "@/components/admin/transaksi/AdminSetoranPengajuanPanel";
+import TransaksiFilters from "@/components/admin/transaksi/TransaksiFilters";
+import TransaksiStatsSection from "@/components/admin/transaksi/TransaksiStats";
+import TransaksiTable from "@/components/admin/transaksi/TransaksiTable";
+import { getApiErrorMessage } from "@/hooks/usePesananFormOptions";
+import { useTransaksi } from "@/hooks/useTransaksi";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  BadgeDollarSign,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  CreditCard,
-  Download,
-  Eye,
-  MoreHorizontal,
-  Search,
-  Wallet,
-  XCircle,
-} from "lucide-react";
+  Transaksi,
+  TransaksiKomisiFilter,
+  TransaksiPayoutFilter,
+  TransaksiStatusFilter,
+} from "@/types/transaksi";
 
-const transaksiData = [
-  {
-    id: 1,
-    kode: "TRX-2026-001",
-    customer: "Ahmad Fauzi",
-    owner: "Futsal Arena Elite",
-    metode: "QRIS",
-    tanggal: "19 Mei 2026",
-    total: "Rp 250.000",
-    status: "success",
-  },
-  {
-    id: 2,
-    kode: "TRX-2026-002",
-    customer: "Rizky Ramadhan",
-    owner: "Badminton Pro Center",
-    metode: "Transfer Bank",
-    tanggal: "20 Mei 2026",
-    total: "Rp 500.000",
-    status: "pending",
-  },
-  {
-    id: 3,
-    kode: "TRX-2026-003",
-    customer: "Dimas Saputra",
-    owner: "Mini Soccer Arena",
-    metode: "E-Wallet",
-    tanggal: "21 Mei 2026",
-    total: "Rp 1.200.000",
-    status: "failed",
-  },
-];
+function AdminTransaksiPageContent() {
+  const searchParams = useSearchParams();
+  const {
+    transaksi,
+    stats,
+    loading,
+    reload,
+    updateTransaksi,
+    markKomisiLunas,
+    markPayoutDicairkan,
+  } = useTransaksi();
 
-export default function AdminTransaksiPage() {
-  return (
-    <div className="space-y-8">
-      {/* =========================================================
-          HEADER
-      ========================================================= */}
-      <div
-        className="
-          flex
-          flex-col
-          gap-5
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<TransaksiStatusFilter>("all");
+  const [komisi, setKomisi] = useState<TransaksiKomisiFilter>("all");
+  const [payout, setPayout] = useState<TransaksiPayoutFilter>("all");
+  const [setoranTab, setSetoranTab] = useState<"pengajuan" | "rekap">("pengajuan");
 
-          xl:flex-row
-          xl:items-center
-          xl:justify-between
-        "
-      >
-        <div>
-          <p
-            className="
-              text-sm
-              font-semibold
-              uppercase
-              tracking-[0.2em]
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) setSearch(q);
 
-              text-cyan-500
-            "
-          >
-            Admin Transaksi
-          </p>
+    const st = searchParams.get("status");
+    if (st === "menunggu" || st === "sukses" || st === "gagal") {
+      setStatus(st);
+    }
 
-          <h1
-            className="
-              mt-2
+    const km = searchParams.get("komisi");
+    if (
+      km === "belum_lunas" ||
+      km === "terpotong" ||
+      km === "lunas"
+    ) {
+      setKomisi(km);
+    }
 
-              text-4xl
-              font-black
-              tracking-tight
-            "
-          >
-            Monitoring Transaksi
-          </h1>
+    const po = searchParams.get("payout");
+    if (po === "menunggu" || po === "dicairkan") {
+      setPayout(po);
+    }
 
-          <p
-            className="
-              mt-3
-              max-w-3xl
+    const setoran = searchParams.get("setoran");
+    if (setoran === "menunggu" || setoran === "pengajuan") {
+      setSetoranTab("pengajuan");
+    }
+  }, [searchParams]);
+  const [selected, setSelected] = useState<Transaksi | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
-              text-base
-              leading-8
+  const filtered = useMemo(() => {
+    return transaksi.filter((item) => {
+      const q = search.toLowerCase();
+      const matchSearch =
+        item.kode_transaksi.toLowerCase().includes(q) ||
+        (item.kode_booking || "").toLowerCase().includes(q) ||
+        (item.user_name || "").toLowerCase().includes(q) ||
+        (item.owner_name || "").toLowerCase().includes(q) ||
+        (item.lapangan_nama || "").toLowerCase().includes(q);
 
-              text-gray-600
-              dark:text-gray-400
-            "
-          >
-            Monitoring seluruh pembayaran booking,
-            transaksi owner, dan aktivitas keuangan
-            platform TA-LAP secara realtime.
-          </p>
+      const matchStatus =
+        status === "all" ||
+        item.status === status ||
+        (status === "gagal" && (item.status === "gagal" || item.status === "refund"));
+
+      const matchKomisi =
+        komisi === "all" || item.status_komisi === komisi;
+
+      const matchPayout =
+        payout === "all" || item.status_payout_owner === payout;
+
+      return matchSearch && matchStatus && matchKomisi && matchPayout;
+    });
+  }, [transaksi, search, status, komisi, payout]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const updated = transaksi.find((item) => item.id === selected.id);
+    if (updated) setSelected(updated);
+  }, [transaksi, selected?.id]);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const openDetail = (item: Transaksi) => {
+    setSelected(item);
+    setDetailOpen(true);
+  };
+
+  const handleUpdate = async (
+    id: string,
+    data: Parameters<typeof updateTransaksi>[1]
+  ) => {
+    try {
+      await updateTransaksi(id, data);
+      showToast("success", "Transaksi berhasil diperbarui");
+    } catch (err: unknown) {
+      showToast("error", getApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  const handleMarkKomisiLunas = async (id: string) => {
+    try {
+      await markKomisiLunas(id);
+      showToast("success", "Komisi owner ditandai lunas");
+    } catch (err: unknown) {
+      showToast("error", getApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  const handleMarkPayout = async (id: string) => {
+    try {
+      await markPayoutDicairkan(id);
+      showToast("success", "Pendapatan owner ditandai dicairkan");
+    } catch (err: unknown) {
+      showToast("error", getApiErrorMessage(err));
+      throw err;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2 className="animate-spin" size={20} />
+          <span>Memuat data transaksi...</span>
         </div>
+      </div>
+    );
+  }
 
-        {/* ACTION */}
-        <button
-          className="
-            inline-flex
-            items-center
-            gap-3
-
-            rounded-2xl
-
-            bg-cyan-500
-
-            px-6
-            py-4
-
-            text-sm
-            font-semibold
-            text-white
-
-            shadow-lg
-            shadow-cyan-500/20
-
-            transition-all
-            duration-300
-
-            hover:scale-[1.02]
-            hover:bg-cyan-400
-          "
+  return (
+    <div className="space-y-6">
+      {toast && (
+        <div
+          className={`fixed right-6 top-24 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
         >
-          <Download size={18} />
-          Export Laporan
+          {toast.message}
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-violet-50 via-white to-white p-6 shadow-sm dark:border-white/10 dark:from-violet-950/20 dark:via-gray-900/50 dark:to-gray-900/50">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+              Keuangan Platform
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+              Monitoring Transaksi
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+              Owner daftar gratis. Setiap booking sukses ={" "}
+              <strong>1 transaksi terpisah</strong> dengan komisi{" "}
+              <strong>5%</strong>. Pembayaran tunai diterima owner — komisi
+              dikumpulkan per bulan lalu admin setorkan ke pihak terkait.
+            </p>
+          </div>
+          <button
+            onClick={reload}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-violet-200 hover:text-violet-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+          >
+            <RefreshCw size={16} />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <TransaksiStatsSection stats={stats} />
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setSetoranTab("pengajuan")}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+            setoranTab === "pengajuan"
+              ? "bg-violet-600 text-white"
+              : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
+          }`}
+        >
+          Pengajuan Setoran Owner
+        </button>
+        <button
+          type="button"
+          onClick={() => setSetoranTab("rekap")}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+            setoranTab === "rekap"
+              ? "bg-amber-600 text-white"
+              : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
+          }`}
+        >
+          Rekap Bulanan Platform
         </button>
       </div>
 
-      {/* =========================================================
-          STATS
-      ========================================================= */}
-      <div
-        className="
-          grid
-          gap-6
-
-          md:grid-cols-2
-          xl:grid-cols-4
-        "
-      >
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-
-            shadow-sm
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Total Transaksi
-              </p>
-
-              <h3
-                className="
-                  mt-3
-
-                  text-4xl
-                  font-black
-                "
-              >
-                12.842
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-16
-                w-16
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-cyan-500/10
-              "
-            >
-              <CreditCard className="text-cyan-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-
-            shadow-sm
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Pendapatan
-              </p>
-
-              <h3
-                className="
-                  mt-3
-
-                  text-4xl
-                  font-black
-                "
-              >
-                Rp 248jt
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-16
-                w-16
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-green-500/10
-              "
-            >
-              <Wallet className="text-green-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-
-            shadow-sm
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Pending
-              </p>
-
-              <h3
-                className="
-                  mt-3
-
-                  text-4xl
-                  font-black
-                "
-              >
-                28
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-16
-                w-16
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-yellow-500/10
-              "
-            >
-              <Clock3 className="text-yellow-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-
-            shadow-sm
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Success Rate
-              </p>
-
-              <h3
-                className="
-                  mt-3
-
-                  text-4xl
-                  font-black
-                "
-              >
-                98%
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-16
-                w-16
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-purple-500/10
-              "
-            >
-              <BadgeDollarSign className="text-purple-500" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* =========================================================
-          FILTER
-      ========================================================= */}
-      <div
-        className="
-          flex
-          flex-col
-          gap-4
-
-          xl:flex-row
-          xl:items-center
-          xl:justify-between
-        "
-      >
-        {/* SEARCH */}
-        <div
-          className="
-            flex
-            items-center
-            gap-3
-
-            rounded-2xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            px-5
-            py-4
-
-            xl:w-[420px]
-          "
-        >
-          <Search
-            size={18}
-            className="text-gray-400"
-          />
-
-          <input
-            type="text"
-            placeholder="Cari transaksi..."
-            className="
-              w-full
-              bg-transparent
-              outline-none
-
-              placeholder:text-gray-400
-            "
-          />
-        </div>
-
-        {/* FILTER BUTTON */}
-        <div className="flex flex-wrap gap-3">
-          <button
-            className="
-              rounded-2xl
-
-              bg-cyan-500
-
-              px-5
-              py-3
-
-              text-sm
-              font-semibold
-              text-white
-            "
-          >
-            Semua
-          </button>
-
-          <button
-            className="
-              rounded-2xl
-
-              border
-              border-gray-300
-              dark:border-white/10
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-            "
-          >
-            Success
-          </button>
-
-          <button
-            className="
-              rounded-2xl
-
-              border
-              border-gray-300
-              dark:border-white/10
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-            "
-          >
-            Pending
-          </button>
-
-          <button
-            className="
-              rounded-2xl
-
-              border
-              border-gray-300
-              dark:border-white/10
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-            "
-          >
-            Failed
-          </button>
-        </div>
-      </div>
-
-      {/* =========================================================
-          TABLE
-      ========================================================= */}
-      <div
-        className="
-          overflow-hidden
-
-          rounded-[32px]
-
-          border
-          border-gray-200
-          dark:border-white/10
-
-          bg-white
-          dark:bg-white/5
-        "
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px]">
-            <thead
-              className="
-                border-b
-                border-gray-200
-                dark:border-white/10
-
-                bg-gray-50
-                dark:bg-white/[0.03]
-              "
-            >
-              <tr>
-                {[
-                  "Kode",
-                  "Customer",
-                  "Owner",
-                  "Metode",
-                  "Tanggal",
-                  "Total",
-                  "Status",
-                  "Aksi",
-                ].map((item) => (
-                  <th
-                    key={item}
-                    className="
-                      px-6
-                      py-5
-                      text-left
-
-                      text-sm
-                      font-semibold
-                    "
-                  >
-                    {item}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody>
-              {transaksiData.map((item) => (
-                <tr
-                  key={item.id}
-                  className="
-                    border-b
-                    border-gray-200
-                    dark:border-white/5
-
-                    transition-all
-                    duration-300
-
-                    hover:bg-gray-50
-                    dark:hover:bg-white/[0.03]
-                  "
-                >
-                  {/* KODE */}
-                  <td className="px-6 py-5">
-                    <div>
-                      <h3 className="font-bold">
-                        {item.kode}
-                      </h3>
-
-                      <p
-                        className="
-                          mt-1
-
-                          text-sm
-                          text-gray-500
-                          dark:text-gray-400
-                        "
-                      >
-                        Transaction ID
-                      </p>
-                    </div>
-                  </td>
-
-                  {/* CUSTOMER */}
-                  <td className="px-6 py-5">
-                    {item.customer}
-                  </td>
-
-                  {/* OWNER */}
-                  <td className="px-6 py-5">
-                    {item.owner}
-                  </td>
-
-                  {/* METODE */}
-                  <td className="px-6 py-5">
-                    <div
-                      className="
-                        inline-flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        bg-gray-100
-                        dark:bg-white/5
-
-                        px-4
-                        py-2
-
-                        text-sm
-                      "
-                    >
-                      <CreditCard size={16} />
-                      {item.metode}
-                    </div>
-                  </td>
-
-                  {/* TANGGAL */}
-                  <td className="px-6 py-5">
-                    <div
-                      className="
-                        flex
-                        items-center
-                        gap-2
-                      "
-                    >
-                      <CalendarDays size={16} />
-                      {item.tanggal}
-                    </div>
-                  </td>
-
-                  {/* TOTAL */}
-                  <td
-                    className="
-                      px-6
-                      py-5
-
-                      font-black
-                    "
-                  >
-                    {item.total}
-                  </td>
-
-                  {/* STATUS */}
-                  <td className="px-6 py-5">
-                    {item.status === "success" && (
-                      <div
-                        className="
-                          inline-flex
-                          items-center
-                          gap-2
-
-                          rounded-full
-
-                          bg-green-500/10
-
-                          px-4
-                          py-2
-
-                          text-sm
-                          font-semibold
-                          text-green-500
-                        "
-                      >
-                        <CheckCircle2 size={16} />
-                        Success
-                      </div>
-                    )}
-
-                    {item.status === "pending" && (
-                      <div
-                        className="
-                          inline-flex
-                          items-center
-                          gap-2
-
-                          rounded-full
-
-                          bg-yellow-500/10
-
-                          px-4
-                          py-2
-
-                          text-sm
-                          font-semibold
-                          text-yellow-500
-                        "
-                      >
-                        <Clock3 size={16} />
-                        Pending
-                      </div>
-                    )}
-
-                    {item.status === "failed" && (
-                      <div
-                        className="
-                          inline-flex
-                          items-center
-                          gap-2
-
-                          rounded-full
-
-                          bg-red-500/10
-
-                          px-4
-                          py-2
-
-                          text-sm
-                          font-semibold
-                          text-red-500
-                        "
-                      >
-                        <XCircle size={16} />
-                        Failed
-                      </div>
-                    )}
-                  </td>
-
-                  {/* ACTION */}
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-3">
-                      <button
-                        className="
-                          inline-flex
-                          items-center
-                          gap-2
-
-                          rounded-2xl
-
-                          border
-                          border-gray-300
-                          dark:border-white/10
-
-                          px-4
-                          py-2
-
-                          text-sm
-                          font-medium
-
-                          transition-all
-                          duration-300
-
-                          hover:border-cyan-500
-                          hover:text-cyan-500
-                        "
-                      >
-                        <Eye size={16} />
-                        Detail
-                      </button>
-
-                      <button
-                        className="
-                          flex
-                          h-11
-                          w-11
-                          items-center
-                          justify-center
-
-                          rounded-2xl
-
-                          border
-                          border-gray-300
-                          dark:border-white/10
-
-                          transition-all
-                          duration-300
-
-                          hover:border-cyan-500
-                        "
-                      >
-                        <MoreHorizontal size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* =========================================================
-          SUMMARY CARD
-      ========================================================= */}
-      <div
-        className="
-          grid
-          gap-6
-
-          xl:grid-cols-2
-        "
-      >
-        {/* INCOME */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-8
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Total Pemasukan Bulan Ini
-              </p>
-
-              <h2
-                className="
-                  mt-4
-
-                  text-5xl
-                  font-black
-                "
-              >
-                Rp 48.250.000
-              </h2>
-            </div>
-
-            <div
-              className="
-                flex
-                h-20
-                w-20
-                items-center
-                justify-center
-
-                rounded-3xl
-
-                bg-green-500/10
-              "
-            >
-              <ArrowUpRight
-                size={40}
-                className="text-green-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* OUTCOME */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-8
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                  dark:text-gray-400
-                "
-              >
-                Refund / Gagal Bulan Ini
-              </p>
-
-              <h2
-                className="
-                  mt-4
-
-                  text-5xl
-                  font-black
-                "
-              >
-                Rp 2.100.000
-              </h2>
-            </div>
-
-            <div
-              className="
-                flex
-                h-20
-                w-20
-                items-center
-                justify-center
-
-                rounded-3xl
-
-                bg-red-500/10
-              "
-            >
-              <ArrowDownRight
-                size={40}
-                className="text-red-500"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      {setoranTab === "pengajuan" ? (
+        <AdminSetoranPengajuanPanel onUpdated={reload} />
+      ) : (
+        <SetoranKomisiTunaiPanel onSettled={reload} />
+      )}
+
+      <TransaksiFilters
+        search={search}
+        setSearch={setSearch}
+        status={status}
+        setStatus={setStatus}
+        komisi={komisi}
+        setKomisi={setKomisi}
+        payout={payout}
+        setPayout={setPayout}
+        totalCount={filtered.length}
+      />
+
+      <TransaksiTable
+        transaksi={filtered}
+        emptyMessage={
+          search || status !== "all" || komisi !== "all" || payout !== "all"
+            ? "Tidak ada transaksi yang cocok dengan filter"
+            : "Belum ada data transaksi"
+        }
+        onDetail={openDetail}
+      />
+
+      <TransaksiDetailModal
+        open={detailOpen}
+        transaksi={selected}
+        onClose={() => setDetailOpen(false)}
+        onUpdate={handleUpdate}
+        onMarkKomisiLunas={handleMarkKomisiLunas}
+        onMarkPayout={handleMarkPayout}
+      />
     </div>
+  );
+}
+
+export default function AdminTransaksiPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[400px] items-center justify-center text-sm text-gray-500">
+          Memuat transaksi...
+        </div>
+      }
+    >
+      <AdminTransaksiPageContent />
+    </Suspense>
   );
 }

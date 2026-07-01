@@ -1,675 +1,231 @@
 "use client";
 
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  BadgeDollarSign,
-  CalendarDays,
-  Download,
-  FileBarChart2,
-  Search,
-  TrendingUp,
-  Users,
-  Wallet,
-} from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, FileBarChart2, Loader2, RefreshCw } from "lucide-react";
+import { useCallback, useState } from "react";
 
-const laporanData = [
-  {
-    id: 1,
-    title: "Pendapatan Bulanan",
-    date: "Mei 2026",
-    amount: "Rp 24.500.000",
-    growth: "+18%",
-    status: "up",
-  },
-  {
-    id: 2,
-    title: "Total Booking",
-    date: "Mei 2026",
-    amount: "1.240 Booking",
-    growth: "+11%",
-    status: "up",
-  },
-  {
-    id: 3,
-    title: "Refund Transaksi",
-    date: "Mei 2026",
-    amount: "Rp 1.200.000",
-    growth: "-4%",
-    status: "down",
-  },
-];
+import LabaRugiStatement from "@/components/admin/laporan/LabaRugiStatement";
+import LaporanBreakdownSection from "@/components/admin/laporan/LaporanBreakdown";
+import LaporanBulananTable from "@/components/admin/laporan/LaporanBulananTable";
+import LaporanExportBar from "@/components/admin/laporan/LaporanExportBar";
+import LaporanOperasionalSection from "@/components/admin/laporan/LaporanOperasional";
+import LaporanRingkasanSection from "@/components/admin/laporan/LaporanRingkasan";
+import LaporanTransaksiDetail from "@/components/admin/laporan/LaporanTransaksiDetail";
+import PengeluaranSection from "@/components/admin/laporan/PengeluaranSection";
+import { getApiErrorMessage } from "@/hooks/usePesananFormOptions";
+import { useLaporanKeuangan } from "@/hooks/useLaporanKeuangan";
+import { useLaporanTransaksi } from "@/hooks/useLaporanTransaksi";
+import { formatDate } from "@/lib/auth";
+import { getLaporanTransaksi } from "@/services/laporan.service";
 
 export default function AdminLaporanPage() {
-  return (
-    <div>
-      {/* HERO */}
-      <div
-        className="
-          relative
-          overflow-hidden
+  const { data, loading, error, reload, addPengeluaran, removePengeluaran } =
+    useLaporanKeuangan();
+  const {
+    transaksi,
+    loading: transaksiLoading,
+    error: transaksiError,
+    reload: reloadTransaksi,
+  } = useLaporanTransaksi(!loading && !error && !!data);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
-          rounded-[32px]
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
 
-          border
-          border-gray-200
-          dark:border-white/10
+  const ensureTransaksi = useCallback(async () => {
+    if (transaksi.length > 0) return transaksi;
+    const result = await getLaporanTransaksi();
+    return result.data;
+  }, [transaksi]);
 
-          bg-white
-          dark:bg-white/5
+  const handleRefresh = () => {
+    reload();
+    reloadTransaksi();
+  };
 
-          p-8
-          md:p-10
-        "
-      >
-        {/* GLOW */}
-        <div
-          className="
-            absolute
-            right-[-100px]
-            top-[-100px]
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2 className="animate-spin" size={20} />
+          <span>Memuat laporan keuangan...</span>
+        </div>
+      </div>
+    );
+  }
 
-            h-72
-            w-72
-
-            rounded-full
-
-            bg-cyan-500/10
-
-            blur-3xl
-          "
-        />
-
-        <div className="relative z-10">
-          <div
-            className="
-              inline-flex
-              items-center
-              gap-2
-
-              rounded-full
-
-              bg-cyan-500/10
-
-              px-4
-              py-2
-
-              text-sm
-              font-semibold
-              text-cyan-500
-            "
-          >
-            <FileBarChart2 size={16} />
-            ADMIN LAPORAN
-          </div>
-
-          <h1
-            className="
-              mt-6
-
-              text-4xl
-              font-black
-              tracking-tight
-
-              md:text-5xl
-            "
-          >
-            Monitoring Laporan Sistem
-          </h1>
-
-          <p
-            className="
-              mt-5
-              max-w-3xl
-
-              text-base
-              leading-8
-
-              text-gray-600
-              dark:text-gray-300
-            "
-          >
-            Pantau seluruh laporan transaksi,
-            pendapatan, booking, owner,
-            dan performa platform secara realtime.
+  if (error || !data) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 px-4 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10">
+          <AlertCircle className="text-red-600 dark:text-red-400" size={24} />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-900 dark:text-white">
+            Gagal memuat laporan
+          </p>
+          <p className="mt-1 max-w-md text-sm text-gray-500">
+            {error || "Terjadi kesalahan saat mengambil data dari server."}
           </p>
         </div>
-      </div>
-
-      {/* STATS */}
-      <div
-        className="
-          mt-10
-
-          grid
-          gap-6
-
-          md:grid-cols-2
-          xl:grid-cols-4
-        "
-      >
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                "
-              >
-                Total Pendapatan
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                Rp 124jt
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-green-500/10
-              "
-            >
-              <Wallet className="text-green-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                "
-              >
-                Total Booking
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                8.420
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-cyan-500/10
-              "
-            >
-              <CalendarDays className="text-cyan-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                "
-              >
-                User Aktif
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                1.240
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-purple-500/10
-              "
-            >
-              <Users className="text-purple-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                "
-              >
-                Growth Platform
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                +24%
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-pink-500/10
-              "
-            >
-              <TrendingUp className="text-pink-500" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* FILTER */}
-      <div
-        className="
-          mt-10
-
-          flex
-          flex-col
-          gap-4
-
-          lg:flex-row
-          lg:items-center
-          lg:justify-between
-        "
-      >
-        {/* SEARCH */}
-        <div
-          className="
-            flex
-            items-center
-            gap-3
-
-            rounded-2xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            px-4
-            py-3
-
-            lg:w-[350px]
-          "
-        >
-          <Search
-            size={18}
-            className="text-gray-400"
-          />
-
-          <input
-            type="text"
-            placeholder="Cari laporan..."
-            className="
-              w-full
-              bg-transparent
-              outline-none
-
-              placeholder:text-gray-400
-            "
-          />
-        </div>
-
-        {/* EXPORT */}
         <button
-          className="
-            flex
-            items-center
-            gap-2
-
-            rounded-2xl
-
-            bg-cyan-500
-
-            px-5
-            py-3
-
-            text-sm
-            font-semibold
-            text-white
-
-            transition
-            hover:bg-cyan-400
-          "
+          onClick={handleRefresh}
+          className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-gray-900"
         >
-          <Download size={18} />
-          Export Laporan
+          <RefreshCw size={16} />
+          Coba Lagi
         </button>
       </div>
+    );
+  }
 
-      {/* LIST */}
-      <div
-        className="
-          mt-8
+  const generatedLabel = formatDate(data.generatedAt);
 
-          grid
-          gap-6
-        "
-      >
-        {laporanData.map((item) => (
-          <div
-            key={item.id}
-            className="
-              rounded-[28px]
+  return (
+    <div className="laporan-print space-y-6">
+      {toast && (
+        <div
+          className={`fixed right-6 top-24 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg print:hidden ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
 
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-
-              transition-all
-              duration-300
-
-              hover:-translate-y-1
-              hover:border-cyan-500/30
-            "
-          >
-            <div
-              className="
-                flex
-                flex-col
-                gap-6
-
-                xl:flex-row
-                xl:items-center
-                xl:justify-between
-              "
-            >
-              {/* LEFT */}
-              <div className="flex gap-5">
-                {/* ICON */}
-                <div
-                  className="
-                    flex
-                    h-16
-                    w-16
-                    items-center
-                    justify-center
-
-                    rounded-2xl
-
-                    bg-cyan-500/10
-                  "
-                >
-                  <BadgeDollarSign className="text-cyan-500" />
-                </div>
-
-                {/* INFO */}
-                <div>
-                  <h3
-                    className="
-                      text-2xl
-                      font-bold
-                    "
-                  >
-                    {item.title}
-                  </h3>
-
-                  <p
-                    className="
-                      mt-1
-
-                      text-sm
-
-                      text-gray-500
-                      dark:text-gray-400
-                    "
-                  >
-                    Periode: {item.date}
-                  </p>
-
-                  <div
-                    className="
-                      mt-5
-
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-xl
-
-                      bg-gray-100
-                      dark:bg-white/5
-
-                      px-4
-                      py-2
-
-                      text-sm
-                    "
-                  >
-                    <CalendarDays size={16} />
-                    Monthly Report
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT */}
-              <div
-                className="
-                  flex
-                  flex-col
-                  items-start
-                  gap-4
-
-                  xl:items-end
-                "
-              >
-                <div>
-                  <h4
-                    className="
-                      text-3xl
-                      font-black
-                    "
-                  >
-                    {item.amount}
-                  </h4>
-
-                  <div
-                    className={`
-                      mt-2
-
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-full
-
-                      px-4
-                      py-2
-
-                      text-sm
-                      font-semibold
-
-                      ${
-                        item.status === "up"
-                          ? `
-                            bg-green-500/10
-                            text-green-500
-                          `
-                          : `
-                            bg-red-500/10
-                            text-red-500
-                          `
-                      }
-                    `}
-                  >
-                    {item.status === "up" ? (
-                      <ArrowUpRight size={16} />
-                    ) : (
-                      <ArrowDownRight size={16} />
-                    )}
-
-                    {item.growth}
-                  </div>
-                </div>
-
-                {/* BUTTON */}
-                <div className="flex gap-3">
-                  <button
-                    className="
-                      rounded-2xl
-
-                      border
-                      border-gray-300
-                      dark:border-white/10
-
-                      px-5
-                      py-3
-
-                      text-sm
-                      font-medium
-
-                      transition
-
-                      hover:border-cyan-500
-                    "
-                  >
-                    Detail
-                  </button>
-
-                  <button
-                    className="
-                      rounded-2xl
-
-                      bg-cyan-500
-
-                      px-5
-                      py-3
-
-                      text-sm
-                      font-semibold
-                      text-white
-
-                      transition
-
-                      hover:bg-cyan-400
-                    "
-                  >
-                    Download
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="hidden print:block print:mb-6">
+        <h1 className="text-2xl font-bold">TA-Lap — Laporan Keuangan Platform</h1>
+        <p className="text-sm text-gray-600">
+          Dicetak: {generatedLabel} · Komisi platform {data.komisi_persen}%
+        </p>
       </div>
+
+      <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-emerald-50 via-white to-white p-6 shadow-sm dark:border-white/10 dark:from-emerald-950/20 dark:via-gray-900/50 dark:to-gray-900/50">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <FileBarChart2 size={14} />
+              Laporan Keuangan & Audit
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              Pemasukan, Pengeluaran & Laba Bersih
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+              Laporan lengkap untuk bisnis: laba rugi jelas, data operasional
+              platform, detail transaksi, dan export backup. Kelola transaksi
+              harian di{" "}
+              <Link
+                href="/admin/transaksi"
+                className="font-medium text-cyan-600 hover:underline dark:text-cyan-400 print:hidden"
+              >
+                Admin Transaksi
+              </Link>
+              .
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              Data per: {generatedLabel}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <LaporanExportBar
+              data={data}
+              transaksi={transaksi}
+              transaksiLoading={transaksiLoading}
+              ensureTransaksi={ensureTransaksi}
+            />
+            <button
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:border-emerald-200 dark:border-white/10 dark:bg-white/5"
+            >
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <LaporanRingkasanSection
+        ringkasan={data.ringkasan}
+        komisiPersen={data.komisi_persen}
+      />
+
+      <LabaRugiStatement labaRugi={data.labaRugi} komisiPersen={data.komisi_persen} />
+
+      <LaporanOperasionalSection data={data.operasional} />
+
+      <div className="grid gap-4 lg:grid-cols-3 print:grid-cols-1">
+        <LaporanBreakdownSection
+          title="Pemasukan"
+          items={data.breakdown.pemasukan}
+          variant="income"
+        />
+        <LaporanBreakdownSection
+          title="Pengeluaran"
+          items={data.breakdown.pengeluaran}
+          variant="expense"
+        />
+        <LaporanBreakdownSection
+          title="Kewajiban & Payout"
+          items={data.breakdown.kewajiban}
+          variant="liability"
+        />
+      </div>
+
+      <LaporanBulananTable data={data.bulanan} />
+
+      {transaksiLoading ? (
+        <div className="flex items-center justify-center rounded-xl border border-gray-200/80 bg-white py-16 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <Loader2 className="animate-spin" size={18} />
+            Memuat detail transaksi...
+          </div>
+        </div>
+      ) : transaksiError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-500/20 dark:bg-red-500/5">
+          <p className="text-sm font-medium text-red-700 dark:text-red-300">
+            Gagal memuat detail transaksi
+          </p>
+          <p className="mt-1 text-xs text-red-600/80 dark:text-red-400/80">
+            {transaksiError}
+          </p>
+          <button
+            onClick={reloadTransaksi}
+            className="mt-3 text-sm font-medium text-red-700 underline dark:text-red-300"
+          >
+            Coba lagi
+          </button>
+        </div>
+      ) : (
+        <LaporanTransaksiDetail transaksi={transaksi} />
+      )}
+
+      <PengeluaranSection
+        items={data.pengeluaran}
+        onAdd={async (form) => {
+          try {
+            await addPengeluaran(form);
+            showToast("success", "Pengeluaran berhasil dicatat");
+          } catch (err) {
+            showToast("error", getApiErrorMessage(err));
+            throw err;
+          }
+        }}
+        onDelete={async (id) => {
+          try {
+            await removePengeluaran(id);
+            showToast("success", "Pengeluaran dihapus");
+          } catch (err) {
+            showToast("error", getApiErrorMessage(err));
+          }
+        }}
+      />
     </div>
   );
 }

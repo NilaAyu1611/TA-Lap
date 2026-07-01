@@ -1,773 +1,224 @@
 "use client";
 
-import {
-  Building2,
-  CheckCircle2,
-  MapPinned,
-  Plus,
-  Search,
-  ShieldCheck,
-  Star,
-  Store,
-  Users,
-  XCircle,
-} from "lucide-react";
+import { Loader2, Plus, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react";
 
-const lapanganData = [
-  {
-    id: 1,
-    name: "Futsal Arena Elite",
-    owner: "Ahmad Sport Center",
-    location: "Depok, Jawa Barat",
-    category: "Futsal",
-    status: "active",
-    rating: 4.9,
-    bookings: 245,
-  },
-  {
-    id: 2,
-    name: "Badminton Hall Pro",
-    owner: "Rizky Arena",
-    location: "Jakarta Selatan",
-    category: "Badminton",
-    status: "pending",
-    rating: 4.7,
-    bookings: 182,
-  },
-  {
-    id: 3,
-    name: "Mini Soccer Prime",
-    owner: "Elite Stadium",
-    location: "Bandung",
-    category: "Mini Soccer",
-    status: "blocked",
-    rating: 4.5,
-    bookings: 98,
-  },
-];
+import DeleteLapanganDialog from "@/components/admin/lapangan/DeleteLapanganDialog";
+import LapanganDetailModal from "@/components/admin/lapangan/LapanganDetailModal";
+import LapanganFilters from "@/components/admin/lapangan/LapanganFilters";
+import LapanganModal from "@/components/admin/lapangan/LapanganModal";
+import LapanganStatsSection from "@/components/admin/lapangan/LapanganStats";
+import LapanganTable from "@/components/admin/lapangan/LapanganTable";
+import { useLapangan } from "@/hooks/useLapangan";
+import { useJenisOlahraga } from "@/hooks/useJenisOlahraga";
+import {
+  Lapangan,
+  LapanganFormData,
+  LapanganStatusFilter,
+} from "@/types/lapangan";
+
+type ModalMode = "create" | "edit" | null;
 
 export default function AdminLapanganPage() {
+  const {
+    lapangan,
+    stats,
+    loading,
+    reload,
+    createLapangan,
+    updateLapangan,
+    deleteLapangan,
+  } = useLapangan();
+  const { items: jenisOptions } = useJenisOlahraga();
+
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<LapanganStatusFilter>("all");
+  const [jenis, setJenis] = useState("all");
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
+  const [selected, setSelected] = useState<Lapangan | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const filtered = useMemo(() => {
+    return lapangan.filter((item) => {
+      const q = search.toLowerCase();
+      const matchSearch =
+        item.nama.toLowerCase().includes(q) ||
+        (item.kota || "").toLowerCase().includes(q) ||
+        (item.owner_name || "").toLowerCase().includes(q) ||
+        (item.alamat || "").toLowerCase().includes(q);
+
+      const matchStatus =
+        status === "all" ||
+        (status === "active" && item.status) ||
+        (status === "inactive" && !item.status);
+
+      const matchJenis =
+        jenis === "all" || (item.jenis || "").toLowerCase() === jenis;
+
+      return matchSearch && matchStatus && matchJenis;
+    });
+  }, [lapangan, search, status, jenis]);
+
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const openCreate = () => {
+    setSelected(null);
+    setModalMode("create");
+  };
+
+  const openEdit = (item: Lapangan) => {
+    setSelected(item);
+    setModalMode("edit");
+  };
+
+  const openDetail = (item: Lapangan) => {
+    setSelected(item);
+    setDetailOpen(true);
+  };
+
+  const openDelete = (item: Lapangan) => {
+    setSelected(item);
+    setDeleteOpen(true);
+  };
+
+  const handleSubmit = async (data: LapanganFormData) => {
+    try {
+      if (modalMode === "create") {
+        await createLapangan(data);
+        showToast("success", "Lapangan berhasil ditambahkan");
+      } else if (modalMode === "edit" && selected) {
+        await updateLapangan(selected.id, data);
+        showToast("success", "Lapangan berhasil diperbarui");
+      }
+      setModalMode(null);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Terjadi kesalahan";
+      showToast("error", message);
+      throw err;
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selected) return;
+    await deleteLapangan(selected.id);
+    showToast("success", "Lapangan berhasil dihapus");
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <Loader2 className="animate-spin" size={20} />
+          <span>Memuat data lapangan...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      {/* HERO */}
-      <div
-        className="
-          relative
-          overflow-hidden
-
-          rounded-[32px]
-
-          border
-          border-gray-200
-          dark:border-white/10
-
-          bg-white
-          dark:bg-white/5
-
-          p-8
-          md:p-10
-        "
-      >
-        {/* GLOW */}
+    <div className="space-y-6">
+      {toast && (
         <div
-          className="
-            absolute
-            right-[-100px]
-            top-[-100px]
+          className={`fixed right-6 top-24 z-50 rounded-lg px-4 py-3 text-sm font-medium shadow-lg ${
+            toast.type === "success"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
 
-            h-72
-            w-72
-
-            rounded-full
-
-            bg-cyan-500/10
-
-            blur-3xl
-          "
-        />
-
-        <div className="relative z-10">
-          <div
-            className="
-              inline-flex
-              items-center
-              gap-2
-
-              rounded-full
-
-              bg-cyan-500/10
-
-              px-4
-              py-2
-
-              text-sm
-              font-semibold
-              text-cyan-500
-            "
-          >
-            <Store size={16} />
-            ADMIN LAPANGAN
+      <div className="overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-r from-cyan-50 via-white to-white p-6 shadow-sm dark:border-white/10 dark:from-cyan-950/20 dark:via-gray-900/50 dark:to-gray-900/50">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-cyan-600 dark:text-cyan-400">
+              Manajemen Venue
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+              Kelola Lapangan
+            </h1>
+            <p className="mt-1 max-w-xl text-sm text-gray-600 dark:text-gray-400">
+              Admin dapat melihat, menambah, mengedit, dan menghapus semua
+              lapangan dari seluruh owner.
+            </p>
           </div>
 
-          <h1
-            className="
-              mt-6
-
-              text-4xl
-              font-black
-              tracking-tight
-
-              md:text-5xl
-            "
-          >
-            Kelola Semua Lapangan
-          </h1>
-
-          <p
-            className="
-              mt-5
-              max-w-3xl
-
-              text-base
-              leading-8
-
-              text-gray-600
-              dark:text-gray-300
-            "
-          >
-            Monitoring seluruh venue, owner lapangan,
-            status lapangan, performa booking,
-            dan validasi venue secara realtime.
-          </p>
-        </div>
-      </div>
-
-      {/* STATS */}
-      <div
-        className="
-          mt-10
-
-          grid
-          gap-6
-
-          md:grid-cols-2
-          xl:grid-cols-4
-        "
-      >
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                "
-              >
-                Total Lapangan
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                245
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-cyan-500/10
-              "
+          <div className="flex gap-2">
+            <button
+              onClick={reload}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-cyan-200 hover:text-cyan-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
             >
-              <Building2 className="text-cyan-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                "
-              >
-                Venue Aktif
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                212
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-green-500/10
-              "
+              <RefreshCw size={16} />
+              Refresh
+            </button>
+            <button
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm shadow-cyan-600/20 transition hover:bg-cyan-500"
             >
-              <CheckCircle2 className="text-green-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                "
-              >
-                Pending Review
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                18
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-yellow-500/10
-              "
-            >
-              <ShieldCheck className="text-yellow-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD */}
-        <div
-          className="
-            rounded-3xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            p-6
-          "
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className="
-                  text-sm
-                  text-gray-500
-                "
-              >
-                Owner Aktif
-              </p>
-
-              <h3
-                className="
-                  mt-3
-                  text-3xl
-                  font-black
-                "
-              >
-                89
-              </h3>
-            </div>
-
-            <div
-              className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
-
-                rounded-2xl
-
-                bg-purple-500/10
-              "
-            >
-              <Users className="text-purple-500" />
-            </div>
+              <Plus size={16} />
+              Tambah Lapangan
+            </button>
           </div>
         </div>
       </div>
 
-      {/* FILTER */}
-      <div
-        className="
-          mt-10
-
-          flex
-          flex-col
-          gap-4
-
-          lg:flex-row
-          lg:items-center
-          lg:justify-between
-        "
-      >
-        {/* SEARCH */}
-        <div
-          className="
-            flex
-            items-center
-            gap-3
-
-            rounded-2xl
-
-            border
-            border-gray-200
-            dark:border-white/10
-
-            bg-white
-            dark:bg-white/5
-
-            px-4
-            py-3
-
-            lg:w-[350px]
-          "
-        >
-          <Search
-            size={18}
-            className="text-gray-400"
-          />
-
-          <input
-            type="text"
-            placeholder="Cari lapangan..."
-            className="
-              w-full
-              bg-transparent
-              outline-none
-
-              placeholder:text-gray-400
-            "
-          />
-        </div>
-
-        {/* ACTION */}
-        <button
-          className="
-            flex
-            items-center
-            gap-2
-
-            rounded-2xl
-
-            bg-cyan-500
-
-            px-5
-            py-3
-
-            text-sm
-            font-semibold
-            text-white
-
-            transition
-            hover:bg-cyan-400
-          "
-        >
-          <Plus size={18} />
-          Tambah Lapangan
-        </button>
-      </div>
-
-      {/* LIST */}
-      <div
-        className="
-          mt-8
-
-          grid
-          gap-6
-        "
-      >
-        {lapanganData.map((item) => (
-          <div
-            key={item.id}
-            className="
-              rounded-[28px]
-
-              border
-              border-gray-200
-              dark:border-white/10
-
-              bg-white
-              dark:bg-white/5
-
-              p-6
-
-              transition-all
-              duration-300
-
-              hover:-translate-y-1
-              hover:border-cyan-500/30
-            "
-          >
-            <div
-              className="
-                flex
-                flex-col
-                gap-6
-
-                xl:flex-row
-                xl:items-center
-                xl:justify-between
-              "
-            >
-              {/* LEFT */}
-              <div className="flex gap-5">
-                {/* ICON */}
-                <div
-                  className="
-                    flex
-                    h-16
-                    w-16
-                    items-center
-                    justify-center
-
-                    rounded-2xl
-
-                    bg-cyan-500/10
-                  "
-                >
-                  <Store className="text-cyan-500" />
-                </div>
-
-                {/* INFO */}
-                <div>
-                  <h3
-                    className="
-                      text-2xl
-                      font-bold
-                    "
-                  >
-                    {item.name}
-                  </h3>
-
-                  <p
-                    className="
-                      mt-1
-
-                      text-sm
-
-                      text-gray-500
-                      dark:text-gray-400
-                    "
-                  >
-                    Owner: {item.owner}
-                  </p>
-
-                  <div
-                    className="
-                      mt-5
-
-                      flex
-                      flex-wrap
-                      gap-3
-                    "
-                  >
-                    <div
-                      className="
-                        flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        bg-gray-100
-                        dark:bg-white/5
-
-                        px-4
-                        py-2
-
-                        text-sm
-                      "
-                    >
-                      <MapPinned size={16} />
-                      {item.location}
-                    </div>
-
-                    <div
-                      className="
-                        rounded-xl
-
-                        bg-gray-100
-                        dark:bg-white/5
-
-                        px-4
-                        py-2
-
-                        text-sm
-                      "
-                    >
-                      {item.category}
-                    </div>
-
-                    <div
-                      className="
-                        flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        bg-gray-100
-                        dark:bg-white/5
-
-                        px-4
-                        py-2
-
-                        text-sm
-                      "
-                    >
-                      <Star
-                        size={16}
-                        className="text-yellow-500"
-                      />
-                      {item.rating}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT */}
-              <div
-                className="
-                  flex
-                  flex-col
-                  items-start
-                  gap-4
-
-                  xl:items-end
-                "
-              >
-                <div>
-                  <h4
-                    className="
-                      text-3xl
-                      font-black
-                    "
-                  >
-                    {item.bookings}
-                  </h4>
-
-                  <p
-                    className="
-                      text-sm
-                      text-gray-500
-                    "
-                  >
-                    Total Booking
-                  </p>
-                </div>
-
-                {/* STATUS */}
-                {item.status === "active" && (
-                  <div
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-full
-
-                      bg-green-500/10
-
-                      px-5
-                      py-2
-
-                      text-sm
-                      font-semibold
-                      text-green-500
-                    "
-                  >
-                    <CheckCircle2 size={16} />
-                    Active
-                  </div>
-                )}
-
-                {item.status === "pending" && (
-                  <div
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-full
-
-                      bg-yellow-500/10
-
-                      px-5
-                      py-2
-
-                      text-sm
-                      font-semibold
-                      text-yellow-500
-                    "
-                  >
-                    <ShieldCheck size={16} />
-                    Pending
-                  </div>
-                )}
-
-                {item.status === "blocked" && (
-                  <div
-                    className="
-                      inline-flex
-                      items-center
-                      gap-2
-
-                      rounded-full
-
-                      bg-red-500/10
-
-                      px-5
-                      py-2
-
-                      text-sm
-                      font-semibold
-                      text-red-500
-                    "
-                  >
-                    <XCircle size={16} />
-                    Blocked
-                  </div>
-                )}
-
-                {/* BUTTON */}
-                <div className="flex gap-3">
-                  <button
-                    className="
-                      rounded-2xl
-
-                      border
-                      border-gray-300
-                      dark:border-white/10
-
-                      px-5
-                      py-3
-
-                      text-sm
-                      font-medium
-
-                      transition
-
-                      hover:border-cyan-500
-                    "
-                  >
-                    Detail
-                  </button>
-
-                  <button
-                    className="
-                      rounded-2xl
-
-                      bg-cyan-500
-
-                      px-5
-                      py-3
-
-                      text-sm
-                      font-semibold
-                      text-white
-
-                      transition
-
-                      hover:bg-cyan-400
-                    "
-                  >
-                    Kelola
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <LapanganStatsSection stats={stats} />
+
+      <LapanganFilters
+        search={search}
+        setSearch={setSearch}
+        status={status}
+        setStatus={setStatus}
+        jenis={jenis}
+        setJenis={setJenis}
+        totalCount={filtered.length}
+        jenisOptions={jenisOptions}
+      />
+
+      <LapanganTable
+        lapangan={filtered}
+        emptyMessage={
+          search || status !== "all" || jenis !== "all"
+            ? "Tidak ada lapangan yang cocok dengan filter"
+            : "Belum ada data lapangan"
+        }
+        onDetail={openDetail}
+        onEdit={openEdit}
+        onDelete={openDelete}
+      />
+
+      <LapanganModal
+        open={modalMode !== null}
+        mode={modalMode === "create" ? "create" : "edit"}
+        onClose={() => setModalMode(null)}
+        onSubmit={handleSubmit}
+        initialData={selected}
+      />
+
+      <LapanganDetailModal
+        open={detailOpen}
+        lapangan={selected}
+        onClose={() => setDetailOpen(false)}
+        onEdit={openEdit}
+      />
+
+      <DeleteLapanganDialog
+        open={deleteOpen}
+        lapangan={selected}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }
